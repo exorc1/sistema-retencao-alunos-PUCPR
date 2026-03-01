@@ -1,7 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-const API = import.meta.env.VITE_API_URL;
-const API_URL = import.meta.env.VITE_API_URL || `${API_BASE}/api/atendimentos`;
+/**
+ * ✅ Render: configure VITE_API_URL = https://sistema-retencao-alunos-pucpr.onrender.com
+ * ✅ Local: cai no http://localhost:8081
+ */
+const API_BASE_RAW = import.meta.env.VITE_API_URL || "http://localhost:8081";
+
+// remove barra final se existir (evita //api/...)
+const API_BASE = String(API_BASE_RAW).replace(/\/+$/, "");
+
+// endpoint final
+const API_URL = `${API_BASE}/api/atendimentos`;
 
 function calcularIdade(dataISO) {
   if (!dataISO) return "";
@@ -92,8 +101,6 @@ const PRAZOS = [
   "A PARTIR DE 18/05 - Início do período para solicitação de reabertura de matrícula (todos os cursos), referente ao 2º semestre de 2026",
 ];
 
-// IMPORTANTE: Mantive os nomes dos campos do backend (rjo, frequencia, etc)
-// Só mudamos o que aparece na tela.
 const initialForm = {
   tipoCurso: "Selecione",
   nomeCompletoAluno: "",
@@ -117,26 +124,20 @@ const initialForm = {
 
   relacaoCurso: "",
 
-  // Informações acadêmicas
   notas: "Selecione",
-  // rjo agora será usado como "Frequência (Sim/Não)"
   rjo: "Selecione",
   rjoDetalhes: "",
-  // frequencia agora será usado como "Com notas boas deveria continuar?"
   frequencia: "Selecione",
   situacaoAcademica: "",
 
-  // Histórico / trancamentos
   qtdTrancamentos: "Selecione",
   ultimoTrancamento: "",
   trancarSemPerderBeneficio: "",
 
-  // Proposta / solução
   proposta: "",
   prazoTrancamento: "",
   prazoCancelamento: "",
 
-  // Etapa final
   fechamento: "",
 };
 
@@ -244,11 +245,17 @@ export default function App() {
   async function carregarAtendimentos() {
     try {
       const r = await fetch(API_URL);
+      if (!r.ok) {
+        const t = await r.text().catch(() => "");
+        throw new Error(`Erro ao carregar (${r.status}): ${t}`);
+      }
       const data = await r.json();
       setAtendimentos(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
       setAtendimentos([]);
+      setToast(e?.message || "Falha ao carregar atendimentos.");
+      setTimeout(() => setToast(""), 3000);
     }
   }
 
@@ -295,7 +302,6 @@ export default function App() {
 
   async function salvar() {
     try {
-      // REGRA: menor sem responsável exige retorno
       if (form.menorDeIdade === "Sim" && form.responsavelProximo !== "Sim") {
         if (!form.retornoResponsavelEm) {
           setToast("Menor de idade sem responsável: informe a data/hora de retorno.");
@@ -400,12 +406,15 @@ export default function App() {
     if (!window.confirm("Tem certeza que deseja remover?")) return;
     try {
       const r = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
-      if (!r.ok) throw new Error("Falha ao remover");
+      if (!r.ok) {
+        const t = await r.text().catch(() => "");
+        throw new Error(`Falha ao remover (${r.status}): ${t}`);
+      }
       setToast("Removido com sucesso.");
       await carregarAtendimentos();
     } catch (e) {
       console.error(e);
-      setToast("Erro ao remover.");
+      setToast(e?.message || "Erro ao remover.");
     } finally {
       setTimeout(() => setToast(""), 2500);
     }
@@ -418,6 +427,7 @@ export default function App() {
           <div>
             <h1 className="text-base font-semibold text-white">Sistema de Retenção de Alunos</h1>
             <p className="text-xs text-white/80">Atendimento / Retenção — formulário + histórico</p>
+            <p className="mt-1 text-[10px] text-white/70">API: {API_URL}</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -453,6 +463,8 @@ export default function App() {
 
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <div className="grid grid-cols-1 gap-6">
+          {/* (seu JSX todo daqui pra baixo continua igual ao que você já mandou) */}
+          {/* --- INÍCIO --- */}
           <section id="inicial">
             <Card title="Formulário Inicial" subtitle="Dados básicos do aluno e do curso.">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -512,8 +524,7 @@ export default function App() {
                       <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                         <b>⚠ Atenção:</b> Medicina no <b>1º período</b> não pode <b>Trancar</b>.
                         <div className="mt-1">
-                          Orientação: <b>não é possível</b>. Se for do interesse do aluno, seguir com{" "}
-                          <b>Cancelamento</b>.
+                          Orientação: <b>não é possível</b>. Se for do interesse do aluno, seguir com <b>Cancelamento</b>.
                         </div>
                       </div>
                     )}
@@ -539,17 +550,12 @@ export default function App() {
                   <Label>Gravação da conversa</Label>
                   <Select
                     value={
-                      form.atendimentoGravado === true
-                        ? "Sim"
-                        : form.atendimentoGravado === false
-                        ? "Não"
-                        : "Selecione"
+                      form.atendimentoGravado === true ? "Sim" : form.atendimentoGravado === false ? "Não" : "Selecione"
                     }
                     onChange={(e) =>
                       setForm((p) => ({
                         ...p,
-                        atendimentoGravado:
-                          e.target.value === "Sim" ? true : e.target.value === "Não" ? false : null,
+                        atendimentoGravado: e.target.value === "Sim" ? true : e.target.value === "Não" ? false : null,
                       }))
                     }
                   >
@@ -563,7 +569,11 @@ export default function App() {
 
                 <div>
                   <Label>Data de nascimento</Label>
-                  <Input type="date" value={form.dataNascimento} onChange={(e) => setForm((p) => ({ ...p, dataNascimento: e.target.value }))} />
+                  <Input
+                    type="date"
+                    value={form.dataNascimento}
+                    onChange={(e) => setForm((p) => ({ ...p, dataNascimento: e.target.value }))}
+                  />
                 </div>
 
                 <div>
@@ -580,7 +590,10 @@ export default function App() {
 
                 <div>
                   <Label>Responsável próximo? (se menor)</Label>
-                  <Select value={form.responsavelProximo} onChange={(e) => setForm((p) => ({ ...p, responsavelProximo: e.target.value }))}>
+                  <Select
+                    value={form.responsavelProximo}
+                    onChange={(e) => setForm((p) => ({ ...p, responsavelProximo: e.target.value }))}
+                  >
                     {SELECT_RESPONSAVEL.map((o) => (
                       <option key={o} value={o}>
                         {o}
@@ -626,7 +639,10 @@ export default function App() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label>Tipo da Solicitação</Label>
-                  <Select value={form.tipoSolicitacao} onChange={(e) => setForm((p) => ({ ...p, tipoSolicitacao: e.target.value }))}>
+                  <Select
+                    value={form.tipoSolicitacao}
+                    onChange={(e) => setForm((p) => ({ ...p, tipoSolicitacao: e.target.value }))}
+                  >
                     {SELECT_TIPO_SOLICITACAO.map((o) => {
                       const disabled = o === "Trancamento" && bloqueiaTrancamento;
                       return (
@@ -641,7 +657,10 @@ export default function App() {
 
                 <div>
                   <Label>Motivo da Solicitação</Label>
-                  <Select value={form.motivoSolicitacao} onChange={(e) => setForm((p) => ({ ...p, motivoSolicitacao: e.target.value }))}>
+                  <Select
+                    value={form.motivoSolicitacao}
+                    onChange={(e) => setForm((p) => ({ ...p, motivoSolicitacao: e.target.value }))}
+                  >
                     {SELECT_MOTIVO.map((o) => (
                       <option key={o} value={o}>
                         {o}
@@ -697,12 +716,9 @@ export default function App() {
                     ))}
                   </Select>
 
-                  {sugestaoContinuar ? (
-                    <p className="mt-2 text-xs text-slate-600">{sugestaoContinuar}</p>
-                  ) : null}
+                  {sugestaoContinuar ? <p className="mt-2 text-xs text-slate-600">{sugestaoContinuar}</p> : null}
                 </div>
 
-                {/* RJO virou frequência (Sim/Não) */}
                 <div>
                   <Label>Frequência (Sim/Não)</Label>
                   <Select value={form.rjo} onChange={(e) => setForm((p) => ({ ...p, rjo: e.target.value }))}>
@@ -715,7 +731,6 @@ export default function App() {
                   <p className="mt-1 text-xs text-slate-600">Use este campo para indicar se o aluno possui frequência adequada.</p>
                 </div>
 
-                {/* No lugar da frequência antiga */}
                 <div>
                   <Label>Com notas boas, deveria continuar com o curso?</Label>
                   <Select value={form.frequencia} onChange={(e) => setForm((p) => ({ ...p, frequencia: e.target.value }))}>
@@ -910,6 +925,7 @@ export default function App() {
               </div>
             </Card>
           </section>
+          {/* --- FIM --- */}
         </div>
       </main>
 
