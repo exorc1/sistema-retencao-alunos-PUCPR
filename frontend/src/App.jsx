@@ -427,7 +427,6 @@ export default function App() {
           <div>
             <h1 className="text-base font-semibold text-white">Sistema de Retenção de Alunos</h1>
             <p className="text-xs text-white/80">Atendimento / Retenção — formulário + histórico</p>
-            <p className="mt-1 text-[10px] text-white/70">API: {API_URL}</p>
           </div>
 
           <div className="flex items-center gap-2">
