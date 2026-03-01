@@ -1,15 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 /**
- * ✅ Render: configure VITE_API_URL = https://sistema-retencao-alunos-pucpr.onrender.com
- * ✅ Local: cai no http://localhost:8081
+ * ✅ Render: defina VITE_API_URL = https://SEU-BACKEND.onrender.com
+ * ✅ Local: cai em http://localhost:8081
  */
 const API_BASE_RAW = import.meta.env.VITE_API_URL || "http://localhost:8081";
-
-// remove barra final se existir (evita //api/...)
 const API_BASE = String(API_BASE_RAW).replace(/\/+$/, "");
-
-// endpoint final
 const API_URL = `${API_BASE}/api/atendimentos`;
 
 function calcularIdade(dataISO) {
@@ -54,6 +50,7 @@ function formatDateTimeBR(isoOrDateLike) {
   }).format(d);
 }
 
+// ====== SIDEBAR STEPS (usa os steps do app atual) ======
 const steps = [
   { id: "inicial", label: "Formulário Inicial" },
   { id: "gravacao", label: "Gravação / Nascimento" },
@@ -68,6 +65,7 @@ const steps = [
   { id: "salvos", label: "Atendimentos Salvos" },
 ];
 
+// ====== SELECTS ======
 const SELECT_SIM_NAO = ["Selecione", "Sim", "Não"];
 const SELECT_TIPO_CURSO = ["Selecione", "Graduação", "Pós-Graduação"];
 const SELECT_TIPO_SOLICITACAO = ["Selecione", "Trancamento", "Cancelamento", "Tratativa"];
@@ -90,7 +88,6 @@ const SELECT_MOTIVO = [
   "Falecimento",
   "Outro",
 ];
-
 const SELECT_NOTAS = ["Selecione", "Boas", "Médias", "Ruins"];
 const SELECT_QTD_TRANC = ["Selecione", "0", "1", "2", "3", "4"];
 const SELECT_RESPONSAVEL = ["Selecione", "Sim", "Não", "N/A"];
@@ -101,6 +98,7 @@ const PRAZOS = [
   "A PARTIR DE 18/05 - Início do período para solicitação de reabertura de matrícula (todos os cursos), referente ao 2º semestre de 2026",
 ];
 
+// ====== FORM (igual ao atual) ======
 const initialForm = {
   tipoCurso: "Selecione",
   nomeCompletoAluno: "",
@@ -124,92 +122,107 @@ const initialForm = {
 
   relacaoCurso: "",
 
+  // Informações acadêmicas
   notas: "Selecione",
-  rjo: "Selecione",
+  rjo: "Selecione", // Frequência (Sim/Não)
   rjoDetalhes: "",
-  frequencia: "Selecione",
+  frequencia: "Selecione", // "Com notas boas, deveria continuar?"
   situacaoAcademica: "",
 
+  // Histórico / trancamentos
   qtdTrancamentos: "Selecione",
   ultimoTrancamento: "",
   trancarSemPerderBeneficio: "",
 
+  // Proposta / solução
   proposta: "",
   prazoTrancamento: "",
   prazoCancelamento: "",
 
+  // Etapa final
   fechamento: "",
 };
 
-function Card({ title, subtitle, children }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-        {subtitle ? <p className="text-sm text-slate-600">{subtitle}</p> : null}
-      </div>
-      {children}
-    </div>
-  );
-}
-
+// ====== UI (estilo do layout antigo) ======
 function Label({ children }) {
-  return <label className="text-sm font-medium text-slate-700">{children}</label>;
+  return <label className="text-sm font-semibold text-slate-700">{children}</label>;
 }
 
-function Input(props) {
+function Input({ className = "", ...props }) {
   return (
     <input
       {...props}
       className={
-        "mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-red-600 focus:outline-none " +
-        (props.className || "")
+        "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none ring-0 placeholder:text-slate-400 focus:border-slate-400 focus:ring-4 focus:ring-slate-100 " +
+        className
       }
     />
   );
 }
 
-function Select(props) {
+function Select({ className = "", children, ...props }) {
   return (
     <select
       {...props}
       className={
-        "mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-red-600 focus:outline-none " +
-        (props.className || "")
+        "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 " +
+        className
       }
-    />
+    >
+      {children}
+    </select>
   );
 }
 
-function Textarea(props) {
+function Textarea({ className = "", ...props }) {
   return (
     <textarea
       {...props}
       className={
-        "mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-red-600 focus:outline-none " +
-        (props.className || "")
+        "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-400 focus:ring-4 focus:ring-slate-100 " +
+        className
       }
     />
   );
 }
 
-function Pill({ active, onClick, children }) {
+function Card({ title, subtitle, children, right }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        "rounded-full px-3 py-1 text-xs font-medium transition " +
-        (active
-          ? "bg-red-700 text-white"
-          : "bg-white text-red-700 ring-1 ring-inset ring-red-200 hover:bg-red-50")
-      }
-    >
-      {children}
-    </button>
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+        <div>
+          <h3 className="text-base font-bold text-slate-900">{title}</h3>
+          {subtitle ? <p className="mt-1 text-sm text-slate-600">{subtitle}</p> : null}
+        </div>
+        {right ? <div className="pt-1">{right}</div> : null}
+      </div>
+      <div className="px-6 py-5">{children}</div>
+    </div>
   );
 }
 
+function Pill({ children }) {
+  return (
+    <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+      {children}
+    </span>
+  );
+}
+
+function Button({ variant = "primary", className = "", ...props }) {
+  const base =
+    "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition active:translate-y-[1px] disabled:opacity-60 disabled:cursor-not-allowed";
+  const styles = {
+    primary: "bg-[#7a0026] text-white hover:brightness-110 focus:ring-4 focus:ring-[#7a0026]/15",
+    subtle: "bg-slate-100 text-slate-900 hover:bg-slate-200 focus:ring-4 focus:ring-slate-200",
+    danger: "bg-rose-600 text-white hover:brightness-110 focus:ring-4 focus:ring-rose-200",
+    outline:
+      "border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 focus:ring-4 focus:ring-slate-100",
+  };
+  return <button {...props} className={`${base} ${styles[variant]} ${className}`} />;
+}
+
+// ====== APP ======
 export default function App() {
   const [activeStep, setActiveStep] = useState("inicial");
   const [form, setForm] = useState(initialForm);
@@ -226,10 +239,8 @@ export default function App() {
 
   const isPrimeiroPeriodoMedicina = useMemo(() => {
     if (!isMed) return false;
-
     if (medicinaPrimeiroPeriodo === "Sim") return true;
     if (medicinaPrimeiroPeriodo === "Não") return false;
-
     return periodoNumero === 1;
   }, [isMed, medicinaPrimeiroPeriodo, periodoNumero]);
 
@@ -241,6 +252,13 @@ export default function App() {
     if (form.notas === "Ruins") return "Sugestão: investigar causa (didática, saúde, financeiro) e propor plano de recuperação.";
     return "";
   }, [form.notas]);
+
+  const menorMsg = useMemo(() => {
+    if (!form.menorDeIdade) return "—";
+    return form.menorDeIdade === "Sim"
+      ? "Menor de idade: solicitar responsável no atendimento."
+      : "Maior de idade.";
+  }, [form.menorDeIdade]);
 
   async function carregarAtendimentos() {
     try {
@@ -302,6 +320,7 @@ export default function App() {
 
   async function salvar() {
     try {
+      // regra: menor sem responsável exige retorno
       if (form.menorDeIdade === "Sim" && form.responsavelProximo !== "Sim") {
         if (!form.retornoResponsavelEm) {
           setToast("Menor de idade sem responsável: informe a data/hora de retorno.");
@@ -421,49 +440,85 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-40 border-b border-red-800 bg-red-700">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div>
-            <h1 className="text-base font-semibold text-white">Sistema de Retenção de Alunos</h1>
-            <p className="text-xs text-white/80">Atendimento / Retenção — formulário + histórico</p>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      {/* TOPBAR */}
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#7a0026] text-white shadow-sm">
+              <span className="text-sm font-black">P</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-black tracking-tight">Sistema de Retenção de Alunos</h1>
+                <Pill>Modelo institucional</Pill>
+              </div>
+              <p className="text-xs text-slate-600">Atendimento / Retenção — formulário + histórico</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={salvar}
-              disabled={loading}
-              className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60"
-            >
-              {loading ? "Salvando..." : editingId ? "Atualizar" : "Salvar"}
-            </button>
-
-            <button
-              type="button"
-              onClick={resetForm}
-              className="rounded-xl bg-red-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-900"
-            >
-              Limpar
-            </button>
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <p className="text-xs font-semibold text-slate-800">Usuário</p>
+              <p className="text-xs text-slate-500">Operador(a)</p>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-slate-200" title="Avatar (placeholder)" />
           </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-4 py-4">
-        <div className="flex flex-wrap gap-2">
-          {steps.map((s) => (
-            <Pill key={s.id} active={activeStep === s.id} onClick={() => scrollTo(s.id)}>
-              {s.label}
-            </Pill>
-          ))}
-        </div>
-      </div>
+      {/* LAYOUT */}
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-4 py-6 lg:grid-cols-[280px_1fr]">
+        {/* SIDEBAR */}
+        <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-20 lg:h-[calc(100vh-120px)] lg:overflow-auto">
+          <div className="mb-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Etapas</p>
+            <p className="mt-1 text-sm text-slate-700">Navegue por seções.</p>
+          </div>
 
-      <main className="mx-auto max-w-6xl px-4 pb-16">
-        <div className="grid grid-cols-1 gap-6">
-          {/* (seu JSX todo daqui pra baixo continua igual ao que você já mandou) */}
-          {/* --- INÍCIO --- */}
+          <nav className="space-y-1">
+            {steps.map((it) => (
+              <button
+                key={it.id}
+                type="button"
+                onClick={() => scrollTo(it.id)}
+                className={[
+                  "w-full rounded-xl px-3 py-2 text-left text-sm font-semibold transition",
+                  activeStep === it.id ? "bg-[#7a0026]/10 text-[#7a0026]" : "text-slate-700 hover:bg-slate-100",
+                ].join(" ")}
+              >
+                {it.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="mt-5 rounded-2xl bg-slate-50 p-3">
+            <p className="text-xs font-bold text-slate-700">Status</p>
+            <p className="mt-1 text-xs text-slate-600">{editingId ? `Editando atendimento #${editingId}` : "Novo atendimento"}</p>
+            <div className="mt-3 flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={resetForm} disabled={loading}>
+                Limpar
+              </Button>
+              <Button className="flex-1" onClick={salvar} disabled={loading}>
+                {loading ? "Salvando..." : editingId ? "Atualizar" : "Gravar e Enviar"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
+            <p className="text-xs font-bold text-slate-700">Aviso</p>
+            <p className="mt-1 text-xs text-slate-600">{menorMsg}</p>
+          </div>
+        </aside>
+
+        {/* CONTENT */}
+        <main className="space-y-5">
+          {toast ? (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm">
+              {toast}
+            </div>
+          ) : null}
+
           <section id="inicial">
             <Card title="Formulário Inicial" subtitle="Dados básicos do aluno e do curso.">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -503,7 +558,7 @@ export default function App() {
                     value={form.curso}
                     onChange={(e) => setForm((p) => ({ ...p, curso: e.target.value }))}
                   />
-                  <p className="mt-1 text-xs text-slate-600">
+                  <p className="mt-2 text-xs text-slate-500">
                     Curso é livre (Pós pode mudar de nome). Se for Medicina, o sistema aplica regra do 1º período.
                   </p>
                 </div>
@@ -520,7 +575,7 @@ export default function App() {
                     </Select>
 
                     {bloqueiaTrancamento && (
-                      <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                         <b>⚠ Atenção:</b> Medicina no <b>1º período</b> não pode <b>Trancar</b>.
                         <div className="mt-1">
                           Orientação: <b>não é possível</b>. Se for do interesse do aluno, seguir com <b>Cancelamento</b>.
@@ -543,14 +598,16 @@ export default function App() {
           </section>
 
           <section id="gravacao">
-            <Card title="Gravação / Nascimento" subtitle="Registro da gravação e dados de idade.">
+            <Card
+              title="Gravação / Nascimento"
+              subtitle="Registro da gravação e dados de idade."
+              right={<Pill>{menorMsg}</Pill>}
+            >
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
                   <Label>Gravação da conversa</Label>
                   <Select
-                    value={
-                      form.atendimentoGravado === true ? "Sim" : form.atendimentoGravado === false ? "Não" : "Selecione"
-                    }
+                    value={form.atendimentoGravado === true ? "Sim" : form.atendimentoGravado === false ? "Não" : "Selecione"}
                     onChange={(e) =>
                       setForm((p) => ({
                         ...p,
@@ -577,22 +634,13 @@ export default function App() {
 
                 <div>
                   <Label>Idade</Label>
-                  <Input value={form.idade} readOnly />
-                  <p className="mt-1 text-xs text-slate-600">
-                    {form.menorDeIdade === "Sim"
-                      ? "Menor de idade: solicitar responsável no atendimento."
-                      : form.menorDeIdade === "Não"
-                      ? "Maior de idade."
-                      : "—"}
-                  </p>
+                  <Input value={form.idade} readOnly className="bg-slate-50" />
+                  <p className="mt-2 text-xs text-slate-500">{menorMsg}</p>
                 </div>
 
                 <div>
                   <Label>Responsável próximo? (se menor)</Label>
-                  <Select
-                    value={form.responsavelProximo}
-                    onChange={(e) => setForm((p) => ({ ...p, responsavelProximo: e.target.value }))}
-                  >
+                  <Select value={form.responsavelProximo} onChange={(e) => setForm((p) => ({ ...p, responsavelProximo: e.target.value }))}>
                     {SELECT_RESPONSAVEL.map((o) => (
                       <option key={o} value={o}>
                         {o}
@@ -602,9 +650,9 @@ export default function App() {
                 </div>
 
                 {form.menorDeIdade === "Sim" && form.responsavelProximo !== "Sim" && (
-                  <div className="md:col-span-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                  <div className="md:col-span-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
                     <b>⚠ Menor de idade:</b> chame o responsável para prosseguir. Caso não esteja próximo, marque retorno.
-                    <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                       <div>
                         <Label>Data/Hora para retorno (responsável)</Label>
                         <Input
@@ -612,7 +660,7 @@ export default function App() {
                           value={form.retornoResponsavelEm}
                           onChange={(e) => setForm((p) => ({ ...p, retornoResponsavelEm: e.target.value }))}
                         />
-                        <p className="mt-1 text-xs text-red-900/70">Obrigatório quando o responsável não está próximo.</p>
+                        <p className="mt-2 text-xs text-rose-900/70">Obrigatório quando o responsável não está próximo.</p>
                       </div>
                     </div>
                   </div>
@@ -625,7 +673,7 @@ export default function App() {
             <Card title="Diagnóstico Externo" subtitle="Informações iniciais do caso.">
               <Label>Diagnóstico externo</Label>
               <Textarea
-                rows={4}
+                rows={5}
                 placeholder="Descreva o cenário informado pelo aluno..."
                 value={form.diagnosticoExterno}
                 onChange={(e) => setForm((p) => ({ ...p, diagnosticoExterno: e.target.value }))}
@@ -638,10 +686,7 @@ export default function App() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label>Tipo da Solicitação</Label>
-                  <Select
-                    value={form.tipoSolicitacao}
-                    onChange={(e) => setForm((p) => ({ ...p, tipoSolicitacao: e.target.value }))}
-                  >
+                  <Select value={form.tipoSolicitacao} onChange={(e) => setForm((p) => ({ ...p, tipoSolicitacao: e.target.value }))}>
                     {SELECT_TIPO_SOLICITACAO.map((o) => {
                       const disabled = o === "Trancamento" && bloqueiaTrancamento;
                       return (
@@ -656,10 +701,7 @@ export default function App() {
 
                 <div>
                   <Label>Motivo da Solicitação</Label>
-                  <Select
-                    value={form.motivoSolicitacao}
-                    onChange={(e) => setForm((p) => ({ ...p, motivoSolicitacao: e.target.value }))}
-                  >
+                  <Select value={form.motivoSolicitacao} onChange={(e) => setForm((p) => ({ ...p, motivoSolicitacao: e.target.value }))}>
                     {SELECT_MOTIVO.map((o) => (
                       <option key={o} value={o}>
                         {o}
@@ -715,7 +757,7 @@ export default function App() {
                     ))}
                   </Select>
 
-                  {sugestaoContinuar ? <p className="mt-2 text-xs text-slate-600">{sugestaoContinuar}</p> : null}
+                  {sugestaoContinuar ? <p className="mt-2 text-xs text-slate-500">{sugestaoContinuar}</p> : null}
                 </div>
 
                 <div>
@@ -727,7 +769,7 @@ export default function App() {
                       </option>
                     ))}
                   </Select>
-                  <p className="mt-1 text-xs text-slate-600">Use este campo para indicar se o aluno possui frequência adequada.</p>
+                  <p className="mt-2 text-xs text-slate-500">Use este campo para indicar se o aluno possui frequência adequada.</p>
                 </div>
 
                 <div>
@@ -739,7 +781,7 @@ export default function App() {
                       </option>
                     ))}
                   </Select>
-                  <p className="mt-1 text-xs text-slate-600">
+                  <p className="mt-2 text-xs text-slate-500">
                     Campo de recomendação (usado para orientar a tratativa). Com “Notas = Boas”, geralmente é <b>Sim</b>.
                   </p>
                 </div>
@@ -827,7 +869,7 @@ export default function App() {
                     ))}
                   </Select>
                   {bloqueiaTrancamento && (
-                    <p className="mt-1 text-xs text-slate-600">Campo desabilitado porque Trancamento não é permitido neste caso.</p>
+                    <p className="mt-2 text-xs text-slate-500">Campo desabilitado porque Trancamento não é permitido neste caso.</p>
                   )}
                 </div>
 
@@ -859,8 +901,16 @@ export default function App() {
           </section>
 
           <section id="salvos">
-            <Card title="Atendimentos Salvos" subtitle="Lista de registros salvos no sistema.">
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
+            <Card
+              title="Atendimentos Salvos"
+              subtitle="Lista de registros salvos no sistema."
+              right={
+                <Button variant="subtle" onClick={carregarAtendimentos} disabled={loading}>
+                  Atualizar
+                </Button>
+              }
+            >
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
                 <table className="min-w-full bg-white">
                   <thead className="bg-slate-50">
                     <tr className="text-left text-xs font-bold uppercase tracking-wide text-slate-600">
@@ -876,63 +926,72 @@ export default function App() {
                       <th className="px-4 py-3">Ações</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {atendimentos.map((a) => (
-                      <tr key={a.id} className="border-t border-slate-200 text-sm">
-                        <td className="px-4 py-3">{a.id}</td>
-                        <td className="px-4 py-3">{a.nomeCompletoAluno}</td>
-                        <td className="px-4 py-3">{a.numeroMatricula}</td>
-                        <td className="px-4 py-3">{a.tipoCurso || "-"}</td>
-                        <td className="px-4 py-3">{a.curso || "-"}</td>
-                        <td className="px-4 py-3">{a.periodo || "-"}</td>
-                        <td className="px-4 py-3">{a.tipoSolicitacao || "-"}</td>
-                        <td className="px-4 py-3">{a.motivoSolicitacao || "-"}</td>
-                        <td className="px-4 py-3">{formatDateTimeBR(a.criadoEm)}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                preencherParaEdicao(a);
-                                scrollTo("inicial");
-                              }}
-                              className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => remover(a.id)}
-                              className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200 hover:bg-red-50"
-                            >
-                              Remover
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
 
-                    {atendimentos.length === 0 && (
+                  <tbody className="divide-y divide-slate-100">
+                    {atendimentos.length === 0 ? (
                       <tr>
-                        <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={10}>
+                        <td className="px-4 py-6 text-center text-sm text-slate-600" colSpan={10}>
                           Nenhum atendimento salvo ainda.
                         </td>
                       </tr>
+                    ) : (
+                      atendimentos.map((a) => (
+                        <tr key={a.id} className="text-sm text-slate-800">
+                          <td className="px-4 py-3 font-semibold">{a.id}</td>
+                          <td className="px-4 py-3">{a.nomeCompletoAluno ?? "-"}</td>
+                          <td className="px-4 py-3">{a.numeroMatricula ?? "-"}</td>
+                          <td className="px-4 py-3">{a.tipoCurso || "-"}</td>
+                          <td className="px-4 py-3">{a.curso || "-"}</td>
+                          <td className="px-4 py-3">{a.periodo || "-"}</td>
+                          <td className="px-4 py-3">{a.tipoSolicitacao || "-"}</td>
+                          <td className="px-4 py-3">{a.motivoSolicitacao || "-"}</td>
+                          <td className="px-4 py-3">{formatDateTimeBR(a.criadoEm)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  preencherParaEdicao(a);
+                                  scrollTo("inicial");
+                                }}
+                              >
+                                Editar
+                              </Button>
+                              <Button variant="danger" onClick={() => remover(a.id)}>
+                                Remover
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>
               </div>
+
+              {editingId ? (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs text-slate-500">Você está editando um registro. Use “Atualizar” ou “Limpar”.</div>
+                  <div className="flex items-center gap-2">
+                    <Pill>Editando #{editingId}</Pill>
+                    <Button variant="outline" onClick={resetForm}>
+                      Cancelar edição
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </Card>
           </section>
-          {/* --- FIM --- */}
-        </div>
-      </main>
 
-      {toast ? (
-        <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-red-700 px-4 py-2 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
+          {/* Footer */}
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 text-xs text-slate-600">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>© {new Date().getFullYear()} • Sistema de Retenção de Alunos</span>
+              <span className="text-slate-500">PUCPR</span>
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
