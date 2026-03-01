@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-const API_BASE = "http://localhost:8081";
+const API = import.meta.env.VITE_API_URL;
 const API_URL = import.meta.env.VITE_API_URL || `${API_BASE}/api/atendimentos`;
 
 function calcularIdade(dataISO) {
