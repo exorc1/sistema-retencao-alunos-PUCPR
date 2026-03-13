@@ -9,6 +9,7 @@ const API_BASE = String(API_BASE_RAW).replace(/\/+$/, "");
 const API_URL = `${API_BASE}/api/atendimentos`;
 const RELATORIO_RESUMO_URL = `${API_BASE}/api/relatorios/atendimentos/resumo`;
 const RELATORIO_CSV_URL = `${API_BASE}/api/relatorios/atendimentos/exportar.csv`;
+const RELATORIO_XLSX_URL = `${API_BASE}/api/relatorios/atendimentos/exportar.xlsx`;
 
 function calcularIdade(dataISO) {
   if (!dataISO) return "";
@@ -344,6 +345,10 @@ export default function App() {
     window.open(RELATORIO_CSV_URL, "_blank");
   }
 
+  function exportarExcel() {
+    window.open(RELATORIO_XLSX_URL, "_blank");
+  }
+
   useEffect(() => {
     carregarAtendimentos();
     carregarRelatorio();
@@ -525,8 +530,11 @@ export default function App() {
             <Button variant="outline" onClick={carregarRelatorio} disabled={loadingRelatorio}>
               {loadingRelatorio ? "Atualizando..." : "Atualizar Relatório"}
             </Button>
+            <Button variant="outline" onClick={exportarExcel}>
+              Exportar Excel
+            </Button>
             <Button variant="outline" onClick={exportarCsv}>
-              Exportar CSV
+              CSV
             </Button>
           </div>
         </div>
@@ -593,17 +601,29 @@ export default function App() {
 
                 <div>
                   <Label>Número de matrícula *</Label>
-                  <Input value={form.numeroMatricula} onChange={(e) => setForm((p) => ({ ...p, numeroMatricula: e.target.value }))} />
+                  <Input
+                    placeholder="Ex: 40107530"
+                    value={form.numeroMatricula}
+                    onChange={(e) => setForm((p) => ({ ...p, numeroMatricula: e.target.value }))}
+                  />
                 </div>
 
                 <div>
                   <Label>Nome completo do aluno *</Label>
-                  <Input value={form.nomeCompletoAluno} onChange={(e) => setForm((p) => ({ ...p, nomeCompletoAluno: e.target.value }))} />
+                  <Input
+                    placeholder="Nome completo"
+                    value={form.nomeCompletoAluno}
+                    onChange={(e) => setForm((p) => ({ ...p, nomeCompletoAluno: e.target.value }))}
+                  />
                 </div>
 
                 <div>
                   <Label>Curso *</Label>
-                  <Input value={form.curso} onChange={(e) => setForm((p) => ({ ...p, curso: e.target.value }))} />
+                  <Input
+                    placeholder="Ex: Psicologia, Direito, Medicina"
+                    value={form.curso}
+                    onChange={(e) => setForm((p) => ({ ...p, curso: e.target.value }))}
+                  />
                 </div>
 
                 {isMed && (
@@ -623,7 +643,11 @@ export default function App() {
 
                 <div>
                   <Label>Período</Label>
-                  <Input value={form.periodo} onChange={(e) => setForm((p) => ({ ...p, periodo: e.target.value }))} />
+                  <Input
+                    placeholder="Ex: 1º, 2º, 3"
+                    value={form.periodo}
+                    onChange={(e) => setForm((p) => ({ ...p, periodo: e.target.value }))}
+                  />
                 </div>
               </div>
             </Card>
@@ -684,7 +708,12 @@ export default function App() {
           <section id="diagnosticoExterno">
             <Card title="Diagnóstico Externo" subtitle="Informações iniciais do caso.">
               <Label>Diagnóstico externo</Label>
-              <Textarea rows={5} value={form.diagnosticoExterno} onChange={(e) => setForm((p) => ({ ...p, diagnosticoExterno: e.target.value }))} />
+              <Textarea
+                rows={5}
+                placeholder="Descreva o cenário informado pelo aluno..."
+                value={form.diagnosticoExterno}
+                onChange={(e) => setForm((p) => ({ ...p, diagnosticoExterno: e.target.value }))}
+              />
             </Card>
           </section>
 
@@ -714,14 +743,24 @@ export default function App() {
           <section id="diagnosticoInterno">
             <Card title="Diagnóstico Interno" subtitle="Análise do atendente.">
               <Label>Diagnóstico interno</Label>
-              <Textarea rows={4} value={form.diagnosticoInterno} onChange={(e) => setForm((p) => ({ ...p, diagnosticoInterno: e.target.value }))} />
+              <Textarea
+                rows={4}
+                placeholder="Análise interna / histórico / contexto..."
+                value={form.diagnosticoInterno}
+                onChange={(e) => setForm((p) => ({ ...p, diagnosticoInterno: e.target.value }))}
+              />
             </Card>
           </section>
 
           <section id="relacaoComCurso">
             <Card title="Relação com o Curso" subtitle="O aluno está alinhado com o curso?">
               <Label>Relação com o curso</Label>
-              <Textarea rows={3} value={form.relacaoCurso} onChange={(e) => setForm((p) => ({ ...p, relacaoCurso: e.target.value }))} />
+              <Textarea
+                rows={3}
+                placeholder="Descreva a relação do aluno com o curso..."
+                value={form.relacaoCurso}
+                onChange={(e) => setForm((p) => ({ ...p, relacaoCurso: e.target.value }))}
+              />
             </Card>
           </section>
 
@@ -752,12 +791,21 @@ export default function App() {
 
                 <div>
                   <Label>Situação acadêmica</Label>
-                  <Input value={form.situacaoAcademica} onChange={(e) => setForm((p) => ({ ...p, situacaoAcademica: e.target.value }))} />
+                  <Input
+                    placeholder="Ex: Regular"
+                    value={form.situacaoAcademica}
+                    onChange={(e) => setForm((p) => ({ ...p, situacaoAcademica: e.target.value }))}
+                  />
                 </div>
 
                 <div className="md:col-span-2">
                   <Label>Observações</Label>
-                  <Textarea rows={2} value={form.rjoDetalhes} onChange={(e) => setForm((p) => ({ ...p, rjoDetalhes: e.target.value }))} />
+                  <Textarea
+                    rows={2}
+                    placeholder="Detalhes relevantes..."
+                    value={form.rjoDetalhes}
+                    onChange={(e) => setForm((p) => ({ ...p, rjoDetalhes: e.target.value }))}
+                  />
                 </div>
               </div>
             </Card>
@@ -775,12 +823,20 @@ export default function App() {
 
                 <div>
                   <Label>Último trancamento</Label>
-                  <Input value={form.ultimoTrancamento} onChange={(e) => setForm((p) => ({ ...p, ultimoTrancamento: e.target.value }))} />
+                  <Input
+                    placeholder="Ex: 2024/2"
+                    value={form.ultimoTrancamento}
+                    onChange={(e) => setForm((p) => ({ ...p, ultimoTrancamento: e.target.value }))}
+                  />
                 </div>
 
                 <div>
                   <Label>Trancar sem perder benefício</Label>
-                  <Input value={form.trancarSemPerderBeneficio} onChange={(e) => setForm((p) => ({ ...p, trancarSemPerderBeneficio: e.target.value }))} />
+                  <Input
+                    placeholder="Ex: Sim, via bolsa / Não"
+                    value={form.trancarSemPerderBeneficio}
+                    onChange={(e) => setForm((p) => ({ ...p, trancarSemPerderBeneficio: e.target.value }))}
+                  />
                 </div>
               </div>
             </Card>
@@ -789,7 +845,12 @@ export default function App() {
           <section id="proposta">
             <Card title="Proposta / Solução" subtitle="Alternativas e proposta final.">
               <Label>Proposta</Label>
-              <Textarea rows={3} value={form.proposta} onChange={(e) => setForm((p) => ({ ...p, proposta: e.target.value }))} />
+              <Textarea
+                rows={3}
+                placeholder="Descreva a proposta/sugestão..."
+                value={form.proposta}
+                onChange={(e) => setForm((p) => ({ ...p, proposta: e.target.value }))}
+              />
 
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
@@ -814,7 +875,12 @@ export default function App() {
           <section id="etapaFinal">
             <Card title="Etapa Final" subtitle="Fechamento e observações finais.">
               <Label>Fechamento</Label>
-              <Textarea rows={3} value={form.fechamento} onChange={(e) => setForm((p) => ({ ...p, fechamento: e.target.value }))} />
+              <Textarea
+                rows={3}
+                placeholder="Conclusão do atendimento..."
+                value={form.fechamento}
+                onChange={(e) => setForm((p) => ({ ...p, fechamento: e.target.value }))}
+              />
             </Card>
           </section>
 
@@ -896,7 +962,8 @@ export default function App() {
                   <Button variant="outline" onClick={carregarRelatorio} disabled={loadingRelatorio}>
                     {loadingRelatorio ? "Atualizando..." : "Atualizar"}
                   </Button>
-                  <Button onClick={exportarCsv}>Exportar CSV</Button>
+                  <Button onClick={exportarExcel}>Exportar Excel</Button>
+                  <Button variant="outline" onClick={exportarCsv}>CSV</Button>
                 </div>
               }
             >

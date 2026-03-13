@@ -2,11 +2,15 @@ package com.example.demo.controller;
 
 import com.example.demo.model.Atendimento;
 import com.example.demo.repository.AtendimentoRepository;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -63,8 +67,8 @@ public class RelatorioController {
         List<Atendimento> lista = repository.findAll();
 
         StringBuilder sb = new StringBuilder();
-        sb.append('\uFEFF'); // BOM para Excel
-        sb.append("id;tipoCurso;nomeCompletoAluno;numeroMatricula;curso;periodo;atendimentoGravado;dataNascimento;idade;menorDeIdade;responsavelProximo;retornoResponsavelEm;diagnosticoExterno;tipoSolicitacao;motivoSolicitacao;diagnosticoInterno;relacaoCurso;notas;rjo;rjoDetalhes;frequencia;situacaoAcademica;qtdTrancamentos;ultimoTrancamento;trancarSemPerderBeneficio;proposta;prazoTrancamento;prazoCancelamento;fechamento;criadoEm\n");
+        sb.append('\uFEFF');
+        sb.append("ID;Tipo de curso;Nome do aluno;Número de matrícula;Curso;Período;Gravação;Data de nascimento;Idade;Menor de idade;Responsável próximo;Retorno responsável em;Diagnóstico externo;Tipo da solicitação;Motivo da solicitação;Diagnóstico interno;Relação com o curso;Notas;Frequência;Observações acadêmicas;Continuar com o curso;Situação acadêmica;Qtd trancamentos;Último trancamento;Trancar sem perder benefício;Proposta;Prazo trancamento;Prazo cancelamento;Fechamento;Criado em\n");
 
         for (Atendimento a : lista) {
             sb.append(csv(a.getId())).append(';')
@@ -106,6 +110,100 @@ public class RelatorioController {
                 .body(sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 
+    @GetMapping("/exportar.xlsx")
+    public ResponseEntity<byte[]> exportarXlsx() throws Exception {
+        List<Atendimento> lista = repository.findAll();
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Atendimentos");
+
+            String[] headers = {
+                    "ID",
+                    "Tipo de curso",
+                    "Nome do aluno",
+                    "Número de matrícula",
+                    "Curso",
+                    "Período",
+                    "Gravação",
+                    "Data de nascimento",
+                    "Idade",
+                    "Menor de idade",
+                    "Responsável próximo",
+                    "Retorno responsável em",
+                    "Diagnóstico externo",
+                    "Tipo da solicitação",
+                    "Motivo da solicitação",
+                    "Diagnóstico interno",
+                    "Relação com o curso",
+                    "Notas",
+                    "Frequência",
+                    "Observações acadêmicas",
+                    "Continuar com o curso",
+                    "Situação acadêmica",
+                    "Qtd trancamentos",
+                    "Último trancamento",
+                    "Trancar sem perder benefício",
+                    "Proposta",
+                    "Prazo trancamento",
+                    "Prazo cancelamento",
+                    "Fechamento",
+                    "Criado em"
+            };
+
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                headerRow.createCell(i).setCellValue(headers[i]);
+            }
+
+            int rowIdx = 1;
+            for (Atendimento a : lista) {
+                Row row = sheet.createRow(rowIdx++);
+
+                row.createCell(0).setCellValue(valor(a.getId()));
+                row.createCell(1).setCellValue(valor(a.getTipoCurso()));
+                row.createCell(2).setCellValue(valor(a.getNomeCompletoAluno()));
+                row.createCell(3).setCellValue(valor(a.getNumeroMatricula()));
+                row.createCell(4).setCellValue(valor(a.getCurso()));
+                row.createCell(5).setCellValue(valor(a.getPeriodo()));
+                row.createCell(6).setCellValue(valor(a.getAtendimentoGravado()));
+                row.createCell(7).setCellValue(valor(a.getDataNascimento()));
+                row.createCell(8).setCellValue(valor(a.getIdade()));
+                row.createCell(9).setCellValue(valor(a.getMenorDeIdade()));
+                row.createCell(10).setCellValue(valor(a.getResponsavelProximo()));
+                row.createCell(11).setCellValue(valor(a.getRetornoResponsavelEm()));
+                row.createCell(12).setCellValue(valor(a.getDiagnosticoExterno()));
+                row.createCell(13).setCellValue(valor(a.getTipoSolicitacao()));
+                row.createCell(14).setCellValue(valor(a.getMotivoSolicitacao()));
+                row.createCell(15).setCellValue(valor(a.getDiagnosticoInterno()));
+                row.createCell(16).setCellValue(valor(a.getRelacaoCurso()));
+                row.createCell(17).setCellValue(valor(a.getNotas()));
+                row.createCell(18).setCellValue(valor(a.getRjo()));
+                row.createCell(19).setCellValue(valor(a.getRjoDetalhes()));
+                row.createCell(20).setCellValue(valor(a.getFrequencia()));
+                row.createCell(21).setCellValue(valor(a.getSituacaoAcademica()));
+                row.createCell(22).setCellValue(valor(a.getQtdTrancamentos()));
+                row.createCell(23).setCellValue(valor(a.getUltimoTrancamento()));
+                row.createCell(24).setCellValue(valor(a.getTrancarSemPerderBeneficio()));
+                row.createCell(25).setCellValue(valor(a.getProposta()));
+                row.createCell(26).setCellValue(valor(a.getPrazoTrancamento()));
+                row.createCell(27).setCellValue(valor(a.getPrazoCancelamento()));
+                row.createCell(28).setCellValue(valor(a.getFechamento()));
+                row.createCell(29).setCellValue(valor(a.getCriadoEm()));
+            }
+
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(out);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=relatorio-atendimentos.xlsx")
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(out.toByteArray());
+        }
+    }
+
     private Map<String, Long> agrupar(List<Atendimento> lista, Function<Atendimento, String> getter) {
         return lista.stream()
                 .map(getter)
@@ -135,5 +233,9 @@ public class RelatorioController {
         String s = String.valueOf(value);
         s = s.replace("\"", "\"\"");
         return "\"" + s + "\"";
+    }
+
+    private String valor(Object value) {
+        return value == null ? "" : String.valueOf(value);
     }
 }
