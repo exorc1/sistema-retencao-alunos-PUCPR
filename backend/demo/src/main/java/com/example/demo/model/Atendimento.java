@@ -27,24 +27,29 @@ public class Atendimento {
     private String responsavelProximo;
     private LocalDateTime retornoResponsavelEm;
 
-    // Diagnósticos
+    // Diagnóstico externo
     @Column(columnDefinition = "TEXT")
     private String diagnosticoExterno;
 
+    // Tipo / motivo
     private String tipoSolicitacao;
     private String motivoSolicitacao;
 
+    // Diagnóstico interno
     @Column(columnDefinition = "TEXT")
     private String diagnosticoInterno;
 
+    // Relação com o curso
     @Column(columnDefinition = "TEXT")
     private String relacaoCurso;
 
     // Informações acadêmicas
     private String notas;
     private String rjo;
+
     @Column(columnDefinition = "TEXT")
     private String rjoDetalhes;
+
     private String frequencia;
     private String situacaoAcademica;
 
