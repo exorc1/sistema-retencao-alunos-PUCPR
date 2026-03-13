@@ -450,7 +450,7 @@ export default function App() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-black tracking-tight">Sistema de Retenção de Alunos</h1>
+                <h1 className="text-base font-black tracking-tight">Arkas Gay</h1>
                 <Pill>Modelo institucional</Pill>
               </div>
               <p className="text-xs text-slate-600">Atendimento / Retenção — formulário + histórico</p>
