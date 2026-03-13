@@ -7,6 +7,8 @@ import React, { useEffect, useMemo, useState } from "react";
 const API_BASE_RAW = import.meta.env.VITE_API_URL || "http://localhost:8081";
 const API_BASE = String(API_BASE_RAW).replace(/\/+$/, "");
 const API_URL = `${API_BASE}/api/atendimentos`;
+const RELATORIO_RESUMO_URL = `${API_BASE}/api/relatorios/atendimentos/resumo`;
+const RELATORIO_CSV_URL = `${API_BASE}/api/relatorios/atendimentos/exportar.csv`;
 
 function calcularIdade(dataISO) {
   if (!dataISO) return "";
@@ -50,7 +52,6 @@ function formatDateTimeBR(isoOrDateLike) {
   }).format(d);
 }
 
-// ====== SIDEBAR STEPS (usa os steps do app atual) ======
 const steps = [
   { id: "inicial", label: "Formulário Inicial" },
   { id: "gravacao", label: "Gravação / Nascimento" },
@@ -63,9 +64,9 @@ const steps = [
   { id: "proposta", label: "Proposta / Solução" },
   { id: "etapaFinal", label: "Etapa Final" },
   { id: "salvos", label: "Atendimentos Salvos" },
+  { id: "relatorios", label: "Relatórios" },
 ];
 
-// ====== SELECTS ======
 const SELECT_SIM_NAO = ["Selecione", "Sim", "Não"];
 const SELECT_TIPO_CURSO = ["Selecione", "Graduação", "Pós-Graduação"];
 const SELECT_TIPO_SOLICITACAO = ["Selecione", "Trancamento", "Cancelamento", "Tratativa"];
@@ -98,7 +99,6 @@ const PRAZOS = [
   "A PARTIR DE 18/05 - Início do período para solicitação de reabertura de matrícula (todos os cursos), referente ao 2º semestre de 2026",
 ];
 
-// ====== FORM (igual ao atual) ======
 const initialForm = {
   tipoCurso: "Selecione",
   nomeCompletoAluno: "",
@@ -122,28 +122,23 @@ const initialForm = {
 
   relacaoCurso: "",
 
-  // Informações acadêmicas
   notas: "Selecione",
-  rjo: "Selecione", // Frequência (Sim/Não)
+  rjo: "Selecione",
   rjoDetalhes: "",
-  frequencia: "Selecione", // "Com notas boas, deveria continuar?"
+  frequencia: "Selecione",
   situacaoAcademica: "",
 
-  // Histórico / trancamentos
   qtdTrancamentos: "Selecione",
   ultimoTrancamento: "",
   trancarSemPerderBeneficio: "",
 
-  // Proposta / solução
   proposta: "",
   prazoTrancamento: "",
   prazoCancelamento: "",
 
-  // Etapa final
   fechamento: "",
 };
 
-// ====== UI (estilo do layout antigo) ======
 function Label({ children }) {
   return <label className="text-sm font-semibold text-slate-700">{children}</label>;
 }
@@ -222,7 +217,52 @@ function Button({ variant = "primary", className = "", ...props }) {
   return <button {...props} className={`${base} ${styles[variant]} ${className}`} />;
 }
 
-// ====== APP ======
+function StatCard({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-2 text-2xl font-black text-slate-900">{value ?? 0}</div>
+    </div>
+  );
+}
+
+function SimpleTable({ title, data }) {
+  const entries = Object.entries(data || {});
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-100 px-4 py-3">
+        <h4 className="text-sm font-bold text-slate-900">{title}</h4>
+      </div>
+      <div className="max-h-72 overflow-auto">
+        <table className="min-w-full text-sm">
+          <thead className="bg-slate-50">
+            <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3">Item</th>
+              <th className="px-4 py-3">Qtd</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {entries.length === 0 ? (
+              <tr>
+                <td className="px-4 py-4 text-slate-500" colSpan={2}>
+                  Sem dados.
+                </td>
+              </tr>
+            ) : (
+              entries.map(([k, v]) => (
+                <tr key={k}>
+                  <td className="px-4 py-3">{k}</td>
+                  <td className="px-4 py-3 font-semibold">{v}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [activeStep, setActiveStep] = useState("inicial");
   const [form, setForm] = useState(initialForm);
@@ -230,7 +270,10 @@ export default function App() {
   const [medicinaPrimeiroPeriodo, setMedicinaPrimeiroPeriodo] = useState("Selecione");
 
   const [atendimentos, setAtendimentos] = useState([]);
+  const [relatorio, setRelatorio] = useState(null);
+
   const [loading, setLoading] = useState(false);
+  const [loadingRelatorio, setLoadingRelatorio] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [toast, setToast] = useState("");
 
@@ -277,8 +320,33 @@ export default function App() {
     }
   }
 
+  async function carregarRelatorio() {
+    try {
+      setLoadingRelatorio(true);
+      const r = await fetch(RELATORIO_RESUMO_URL);
+      if (!r.ok) {
+        const t = await r.text().catch(() => "");
+        throw new Error(`Erro ao carregar relatório (${r.status}): ${t}`);
+      }
+      const data = await r.json();
+      setRelatorio(data);
+    } catch (e) {
+      console.error(e);
+      setRelatorio(null);
+      setToast(e?.message || "Falha ao carregar relatório.");
+      setTimeout(() => setToast(""), 3000);
+    } finally {
+      setLoadingRelatorio(false);
+    }
+  }
+
+  function exportarCsv() {
+    window.open(RELATORIO_CSV_URL, "_blank");
+  }
+
   useEffect(() => {
     carregarAtendimentos();
+    carregarRelatorio();
   }, []);
 
   useEffect(() => {
@@ -320,7 +388,6 @@ export default function App() {
 
   async function salvar() {
     try {
-      // regra: menor sem responsável exige retorno
       if (form.menorDeIdade === "Sim" && form.responsavelProximo !== "Sim") {
         if (!form.retornoResponsavelEm) {
           setToast("Menor de idade sem responsável: informe a data/hora de retorno.");
@@ -360,6 +427,7 @@ export default function App() {
       setToast(isEdit ? "Atendimento atualizado com sucesso." : "Atendimento salvo com sucesso.");
       resetForm();
       await carregarAtendimentos();
+      await carregarRelatorio();
       scrollTo("salvos");
     } catch (e) {
       console.error(e);
@@ -374,7 +442,6 @@ export default function App() {
     setEditingId(a.id);
     setForm({
       ...initialForm,
-
       tipoCurso: a.tipoCurso ?? "Selecione",
       nomeCompletoAluno: a.nomeCompletoAluno ?? "",
       numeroMatricula: a.numeroMatricula ?? "",
@@ -389,12 +456,9 @@ export default function App() {
       retornoResponsavelEm: a.retornoResponsavelEm ?? "",
 
       diagnosticoExterno: a.diagnosticoExterno ?? "",
-
       tipoSolicitacao: a.tipoSolicitacao ?? "Selecione",
       motivoSolicitacao: a.motivoSolicitacao ?? "Selecione",
-
       diagnosticoInterno: a.diagnosticoInterno ?? "",
-
       relacaoCurso: a.relacaoCurso ?? "",
 
       notas: a.notas ?? "Selecione",
@@ -431,6 +495,7 @@ export default function App() {
       }
       setToast("Removido com sucesso.");
       await carregarAtendimentos();
+      await carregarRelatorio();
     } catch (e) {
       console.error(e);
       setToast(e?.message || "Erro ao remover.");
@@ -441,7 +506,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      {/* TOPBAR */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
@@ -457,19 +521,18 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-xs font-semibold text-slate-800">Usuário</p>
-              <p className="text-xs text-slate-500">Operador(a)</p>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-slate-200" title="Avatar (placeholder)" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={carregarRelatorio} disabled={loadingRelatorio}>
+              {loadingRelatorio ? "Atualizando..." : "Atualizar Relatório"}
+            </Button>
+            <Button variant="outline" onClick={exportarCsv}>
+              Exportar CSV
+            </Button>
           </div>
         </div>
       </header>
 
-      {/* LAYOUT */}
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-4 py-6 lg:grid-cols-[280px_1fr]">
-        {/* SIDEBAR */}
         <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-20 lg:h-[calc(100vh-120px)] lg:overflow-auto">
           <div className="mb-4">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Etapas</p>
@@ -511,7 +574,6 @@ export default function App() {
           </div>
         </aside>
 
-        {/* CONTENT */}
         <main className="space-y-5">
           {toast ? (
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm">
@@ -525,61 +587,35 @@ export default function App() {
                 <div>
                   <Label>Tipo de curso *</Label>
                   <Select value={form.tipoCurso} onChange={(e) => setForm((p) => ({ ...p, tipoCurso: e.target.value }))}>
-                    {SELECT_TIPO_CURSO.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
+                    {SELECT_TIPO_CURSO.map((o) => <option key={o} value={o}>{o}</option>)}
                   </Select>
                 </div>
 
                 <div>
                   <Label>Número de matrícula *</Label>
-                  <Input
-                    placeholder="Matrícula"
-                    value={form.numeroMatricula}
-                    onChange={(e) => setForm((p) => ({ ...p, numeroMatricula: e.target.value }))}
-                  />
+                  <Input value={form.numeroMatricula} onChange={(e) => setForm((p) => ({ ...p, numeroMatricula: e.target.value }))} />
                 </div>
 
                 <div>
                   <Label>Nome completo do aluno *</Label>
-                  <Input
-                    placeholder="Nome completo"
-                    value={form.nomeCompletoAluno}
-                    onChange={(e) => setForm((p) => ({ ...p, nomeCompletoAluno: e.target.value }))}
-                  />
+                  <Input value={form.nomeCompletoAluno} onChange={(e) => setForm((p) => ({ ...p, nomeCompletoAluno: e.target.value }))} />
                 </div>
 
                 <div>
                   <Label>Curso *</Label>
-                  <Input
-                    placeholder="Ex: Medicina, Direito, Pós em Gestão..."
-                    value={form.curso}
-                    onChange={(e) => setForm((p) => ({ ...p, curso: e.target.value }))}
-                  />
-                  <p className="mt-2 text-xs text-slate-500">
-                    Curso é livre (Pós pode mudar de nome). Se for Medicina, o sistema aplica regra do 1º período.
-                  </p>
+                  <Input value={form.curso} onChange={(e) => setForm((p) => ({ ...p, curso: e.target.value }))} />
                 </div>
 
                 {isMed && (
                   <div>
                     <Label>É 1º período? (somente Medicina)</Label>
                     <Select value={medicinaPrimeiroPeriodo} onChange={(e) => setMedicinaPrimeiroPeriodo(e.target.value)}>
-                      {SELECT_SIM_NAO.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
+                      {SELECT_SIM_NAO.map((o) => <option key={o} value={o}>{o}</option>)}
                     </Select>
 
                     {bloqueiaTrancamento && (
                       <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                         <b>⚠ Atenção:</b> Medicina no <b>1º período</b> não pode <b>Trancar</b>.
-                        <div className="mt-1">
-                          Orientação: <b>não é possível</b>. Se for do interesse do aluno, seguir com <b>Cancelamento</b>.
-                        </div>
                       </div>
                     )}
                   </div>
@@ -587,22 +623,14 @@ export default function App() {
 
                 <div>
                   <Label>Período</Label>
-                  <Input
-                    placeholder="Ex: 1, 1º, 2, 3..."
-                    value={form.periodo}
-                    onChange={(e) => setForm((p) => ({ ...p, periodo: e.target.value }))}
-                  />
+                  <Input value={form.periodo} onChange={(e) => setForm((p) => ({ ...p, periodo: e.target.value }))} />
                 </div>
               </div>
             </Card>
           </section>
 
           <section id="gravacao">
-            <Card
-              title="Gravação / Nascimento"
-              subtitle="Registro da gravação e dados de idade."
-              right={<Pill>{menorMsg}</Pill>}
-            >
+            <Card title="Gravação / Nascimento" subtitle="Registro da gravação e dados de idade." right={<Pill>{menorMsg}</Pill>}>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
                   <Label>Gravação da conversa</Label>
@@ -615,53 +643,37 @@ export default function App() {
                       }))
                     }
                   >
-                    {SELECT_SIM_NAO.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
+                    {SELECT_SIM_NAO.map((o) => <option key={o} value={o}>{o}</option>)}
                   </Select>
                 </div>
 
                 <div>
                   <Label>Data de nascimento</Label>
-                  <Input
-                    type="date"
-                    value={form.dataNascimento}
-                    onChange={(e) => setForm((p) => ({ ...p, dataNascimento: e.target.value }))}
-                  />
+                  <Input type="date" value={form.dataNascimento} onChange={(e) => setForm((p) => ({ ...p, dataNascimento: e.target.value }))} />
                 </div>
 
                 <div>
                   <Label>Idade</Label>
                   <Input value={form.idade} readOnly className="bg-slate-50" />
-                  <p className="mt-2 text-xs text-slate-500">{menorMsg}</p>
                 </div>
 
                 <div>
                   <Label>Responsável próximo? (se menor)</Label>
                   <Select value={form.responsavelProximo} onChange={(e) => setForm((p) => ({ ...p, responsavelProximo: e.target.value }))}>
-                    {SELECT_RESPONSAVEL.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
+                    {SELECT_RESPONSAVEL.map((o) => <option key={o} value={o}>{o}</option>)}
                   </Select>
                 </div>
 
                 {form.menorDeIdade === "Sim" && form.responsavelProximo !== "Sim" && (
                   <div className="md:col-span-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
-                    <b>⚠ Menor de idade:</b> chame o responsável para prosseguir. Caso não esteja próximo, marque retorno.
-                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <div>
-                        <Label>Data/Hora para retorno (responsável)</Label>
-                        <Input
-                          type="datetime-local"
-                          value={form.retornoResponsavelEm}
-                          onChange={(e) => setForm((p) => ({ ...p, retornoResponsavelEm: e.target.value }))}
-                        />
-                        <p className="mt-2 text-xs text-rose-900/70">Obrigatório quando o responsável não está próximo.</p>
-                      </div>
+                    <b>⚠ Menor de idade:</b> chame o responsável para prosseguir.
+                    <div className="mt-3">
+                      <Label>Data/Hora para retorno (responsável)</Label>
+                      <Input
+                        type="datetime-local"
+                        value={form.retornoResponsavelEm}
+                        onChange={(e) => setForm((p) => ({ ...p, retornoResponsavelEm: e.target.value }))}
+                      />
                     </div>
                   </div>
                 )}
@@ -672,12 +684,7 @@ export default function App() {
           <section id="diagnosticoExterno">
             <Card title="Diagnóstico Externo" subtitle="Informações iniciais do caso.">
               <Label>Diagnóstico externo</Label>
-              <Textarea
-                rows={5}
-                placeholder="Descreva o cenário informado pelo aluno..."
-                value={form.diagnosticoExterno}
-                onChange={(e) => setForm((p) => ({ ...p, diagnosticoExterno: e.target.value }))}
-              />
+              <Textarea rows={5} value={form.diagnosticoExterno} onChange={(e) => setForm((p) => ({ ...p, diagnosticoExterno: e.target.value }))} />
             </Card>
           </section>
 
@@ -689,12 +696,7 @@ export default function App() {
                   <Select value={form.tipoSolicitacao} onChange={(e) => setForm((p) => ({ ...p, tipoSolicitacao: e.target.value }))}>
                     {SELECT_TIPO_SOLICITACAO.map((o) => {
                       const disabled = o === "Trancamento" && bloqueiaTrancamento;
-                      return (
-                        <option key={o} value={o} disabled={disabled}>
-                          {o}
-                          {disabled ? " (indisponível no 1º período de Medicina)" : ""}
-                        </option>
-                      );
+                      return <option key={o} value={o} disabled={disabled}>{o}</option>;
                     })}
                   </Select>
                 </div>
@@ -702,45 +704,24 @@ export default function App() {
                 <div>
                   <Label>Motivo da Solicitação</Label>
                   <Select value={form.motivoSolicitacao} onChange={(e) => setForm((p) => ({ ...p, motivoSolicitacao: e.target.value }))}>
-                    {SELECT_MOTIVO.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
+                    {SELECT_MOTIVO.map((o) => <option key={o} value={o}>{o}</option>)}
                   </Select>
                 </div>
               </div>
-
-              {bloqueiaTrancamento && (
-                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                  <b>Fluxo sugerido:</b> informar que não é possível trancar no 1º período de Medicina e, se o aluno desejar, seguir com{" "}
-                  <b>Cancelamento</b>.
-                </div>
-              )}
             </Card>
           </section>
 
           <section id="diagnosticoInterno">
             <Card title="Diagnóstico Interno" subtitle="Análise do atendente.">
               <Label>Diagnóstico interno</Label>
-              <Textarea
-                rows={4}
-                placeholder="Análise interna / histórico / contexto..."
-                value={form.diagnosticoInterno}
-                onChange={(e) => setForm((p) => ({ ...p, diagnosticoInterno: e.target.value }))}
-              />
+              <Textarea rows={4} value={form.diagnosticoInterno} onChange={(e) => setForm((p) => ({ ...p, diagnosticoInterno: e.target.value }))} />
             </Card>
           </section>
 
           <section id="relacaoComCurso">
             <Card title="Relação com o Curso" subtitle="O aluno está alinhado com o curso?">
               <Label>Relação com o curso</Label>
-              <Textarea
-                rows={3}
-                placeholder="Descreva a relação do aluno com o curso..."
-                value={form.relacaoCurso}
-                onChange={(e) => setForm((p) => ({ ...p, relacaoCurso: e.target.value }))}
-              />
+              <Textarea rows={3} value={form.relacaoCurso} onChange={(e) => setForm((p) => ({ ...p, relacaoCurso: e.target.value }))} />
             </Card>
           </section>
 
@@ -750,59 +731,33 @@ export default function App() {
                 <div>
                   <Label>Notas</Label>
                   <Select value={form.notas} onChange={(e) => setForm((p) => ({ ...p, notas: e.target.value }))}>
-                    {SELECT_NOTAS.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
+                    {SELECT_NOTAS.map((o) => <option key={o} value={o}>{o}</option>)}
                   </Select>
-
                   {sugestaoContinuar ? <p className="mt-2 text-xs text-slate-500">{sugestaoContinuar}</p> : null}
                 </div>
 
                 <div>
                   <Label>Frequência (Sim/Não)</Label>
                   <Select value={form.rjo} onChange={(e) => setForm((p) => ({ ...p, rjo: e.target.value }))}>
-                    {SELECT_SIM_NAO.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
+                    {SELECT_SIM_NAO.map((o) => <option key={o} value={o}>{o}</option>)}
                   </Select>
-                  <p className="mt-2 text-xs text-slate-500">Use este campo para indicar se o aluno possui frequência adequada.</p>
                 </div>
 
                 <div>
                   <Label>Com notas boas, deveria continuar com o curso?</Label>
                   <Select value={form.frequencia} onChange={(e) => setForm((p) => ({ ...p, frequencia: e.target.value }))}>
-                    {SELECT_SIM_NAO.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
+                    {SELECT_SIM_NAO.map((o) => <option key={o} value={o}>{o}</option>)}
                   </Select>
-                  <p className="mt-2 text-xs text-slate-500">
-                    Campo de recomendação (usado para orientar a tratativa). Com “Notas = Boas”, geralmente é <b>Sim</b>.
-                  </p>
                 </div>
 
                 <div>
                   <Label>Situação acadêmica</Label>
-                  <Input
-                    placeholder="Ex: Regular"
-                    value={form.situacaoAcademica}
-                    onChange={(e) => setForm((p) => ({ ...p, situacaoAcademica: e.target.value }))}
-                  />
+                  <Input value={form.situacaoAcademica} onChange={(e) => setForm((p) => ({ ...p, situacaoAcademica: e.target.value }))} />
                 </div>
 
                 <div className="md:col-span-2">
-                  <Label>Observações (frequência / notas / contexto)</Label>
-                  <Textarea
-                    rows={2}
-                    placeholder="Detalhes relevantes..."
-                    value={form.rjoDetalhes}
-                    onChange={(e) => setForm((p) => ({ ...p, rjoDetalhes: e.target.value }))}
-                  />
+                  <Label>Observações</Label>
+                  <Textarea rows={2} value={form.rjoDetalhes} onChange={(e) => setForm((p) => ({ ...p, rjoDetalhes: e.target.value }))} />
                 </div>
               </div>
             </Card>
@@ -814,30 +769,18 @@ export default function App() {
                 <div>
                   <Label>Qtd. trancamentos</Label>
                   <Select value={form.qtdTrancamentos} onChange={(e) => setForm((p) => ({ ...p, qtdTrancamentos: e.target.value }))}>
-                    {SELECT_QTD_TRANC.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
+                    {SELECT_QTD_TRANC.map((o) => <option key={o} value={o}>{o}</option>)}
                   </Select>
                 </div>
 
                 <div>
                   <Label>Último trancamento</Label>
-                  <Input
-                    placeholder="Ex: 2024/2"
-                    value={form.ultimoTrancamento}
-                    onChange={(e) => setForm((p) => ({ ...p, ultimoTrancamento: e.target.value }))}
-                  />
+                  <Input value={form.ultimoTrancamento} onChange={(e) => setForm((p) => ({ ...p, ultimoTrancamento: e.target.value }))} />
                 </div>
 
                 <div>
                   <Label>Trancar sem perder benefício</Label>
-                  <Input
-                    placeholder="Descreva"
-                    value={form.trancarSemPerderBeneficio}
-                    onChange={(e) => setForm((p) => ({ ...p, trancarSemPerderBeneficio: e.target.value }))}
-                  />
+                  <Input value={form.trancarSemPerderBeneficio} onChange={(e) => setForm((p) => ({ ...p, trancarSemPerderBeneficio: e.target.value }))} />
                 </div>
               </div>
             </Card>
@@ -846,42 +789,22 @@ export default function App() {
           <section id="proposta">
             <Card title="Proposta / Solução" subtitle="Alternativas e proposta final.">
               <Label>Proposta</Label>
-              <Textarea
-                rows={3}
-                placeholder="Descreva a proposta/sugestão..."
-                value={form.proposta}
-                onChange={(e) => setForm((p) => ({ ...p, proposta: e.target.value }))}
-              />
+              <Textarea rows={3} value={form.proposta} onChange={(e) => setForm((p) => ({ ...p, proposta: e.target.value }))} />
 
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label>Prazos (Trancamento)</Label>
-                  <Select
-                    value={form.prazoTrancamento}
-                    onChange={(e) => setForm((p) => ({ ...p, prazoTrancamento: e.target.value }))}
-                    disabled={bloqueiaTrancamento}
-                  >
+                  <Select value={form.prazoTrancamento} onChange={(e) => setForm((p) => ({ ...p, prazoTrancamento: e.target.value }))}>
                     <option value="">Selecione</option>
-                    {PRAZOS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
+                    {PRAZOS.map((p) => <option key={p} value={p}>{p}</option>)}
                   </Select>
-                  {bloqueiaTrancamento && (
-                    <p className="mt-2 text-xs text-slate-500">Campo desabilitado porque Trancamento não é permitido neste caso.</p>
-                  )}
                 </div>
 
                 <div>
                   <Label>Prazos (Cancelamento)</Label>
                   <Select value={form.prazoCancelamento} onChange={(e) => setForm((p) => ({ ...p, prazoCancelamento: e.target.value }))}>
                     <option value="">Selecione</option>
-                    {PRAZOS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
+                    {PRAZOS.map((p) => <option key={p} value={p}>{p}</option>)}
                   </Select>
                 </div>
               </div>
@@ -891,12 +814,7 @@ export default function App() {
           <section id="etapaFinal">
             <Card title="Etapa Final" subtitle="Fechamento e observações finais.">
               <Label>Fechamento</Label>
-              <Textarea
-                rows={3}
-                placeholder="Conclusão do atendimento..."
-                value={form.fechamento}
-                onChange={(e) => setForm((p) => ({ ...p, fechamento: e.target.value }))}
-              />
+              <Textarea rows={3} value={form.fechamento} onChange={(e) => setForm((p) => ({ ...p, fechamento: e.target.value }))} />
             </Card>
           </section>
 
@@ -917,11 +835,10 @@ export default function App() {
                       <th className="px-4 py-3">ID</th>
                       <th className="px-4 py-3">Nome</th>
                       <th className="px-4 py-3">Matrícula</th>
-                      <th className="px-4 py-3">Tipo curso</th>
                       <th className="px-4 py-3">Curso</th>
-                      <th className="px-4 py-3">Período</th>
                       <th className="px-4 py-3">Tipo</th>
                       <th className="px-4 py-3">Motivo</th>
+                      <th className="px-4 py-3">Retorno em</th>
                       <th className="px-4 py-3">Criado em</th>
                       <th className="px-4 py-3">Ações</th>
                     </tr>
@@ -930,7 +847,7 @@ export default function App() {
                   <tbody className="divide-y divide-slate-100">
                     {atendimentos.length === 0 ? (
                       <tr>
-                        <td className="px-4 py-6 text-center text-sm text-slate-600" colSpan={10}>
+                        <td className="px-4 py-6 text-center text-sm text-slate-600" colSpan={9}>
                           Nenhum atendimento salvo ainda.
                         </td>
                       </tr>
@@ -940,11 +857,10 @@ export default function App() {
                           <td className="px-4 py-3 font-semibold">{a.id}</td>
                           <td className="px-4 py-3">{a.nomeCompletoAluno ?? "-"}</td>
                           <td className="px-4 py-3">{a.numeroMatricula ?? "-"}</td>
-                          <td className="px-4 py-3">{a.tipoCurso || "-"}</td>
                           <td className="px-4 py-3">{a.curso || "-"}</td>
-                          <td className="px-4 py-3">{a.periodo || "-"}</td>
                           <td className="px-4 py-3">{a.tipoSolicitacao || "-"}</td>
                           <td className="px-4 py-3">{a.motivoSolicitacao || "-"}</td>
+                          <td className="px-4 py-3">{a.retornoResponsavelEm ? formatDateTimeBR(a.retornoResponsavelEm) : "-"}</td>
                           <td className="px-4 py-3">{formatDateTimeBR(a.criadoEm)}</td>
                           <td className="px-4 py-3">
                             <div className="flex gap-2">
@@ -968,22 +884,47 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
-
-              {editingId ? (
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-xs text-slate-500">Você está editando um registro. Use “Atualizar” ou “Limpar”.</div>
-                  <div className="flex items-center gap-2">
-                    <Pill>Editando #{editingId}</Pill>
-                    <Button variant="outline" onClick={resetForm}>
-                      Cancelar edição
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
             </Card>
           </section>
 
-          {/* Footer */}
+          <section id="relatorios">
+            <Card
+              title="Relatórios"
+              subtitle="Resumo geral dos atendimentos e exportação completa."
+              right={
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={carregarRelatorio} disabled={loadingRelatorio}>
+                    {loadingRelatorio ? "Atualizando..." : "Atualizar"}
+                  </Button>
+                  <Button onClick={exportarCsv}>Exportar CSV</Button>
+                </div>
+              }
+            >
+              {!relatorio ? (
+                <div className="text-sm text-slate-500">Relatório indisponível no momento.</div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                    <StatCard label="Total de atendimentos" value={relatorio.totalAtendimentos} />
+                    <StatCard label="Menores de idade" value={relatorio.totalMenores} />
+                    <StatCard label="Com retorno agendado" value={relatorio.totalComRetornoAgendado} />
+                    <StatCard label="Retornos vencidos" value={relatorio.totalRetornosVencidos} />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <SimpleTable title="Por tipo de curso" data={relatorio.porTipoCurso} />
+                    <SimpleTable title="Por tipo de solicitação" data={relatorio.porTipoSolicitacao} />
+                    <SimpleTable title="Por motivo" data={relatorio.porMotivoSolicitacao} />
+                    <SimpleTable title="Por curso" data={relatorio.porCurso} />
+                    <SimpleTable title="Por notas" data={relatorio.porNotas} />
+                    <SimpleTable title="Por frequência" data={relatorio.porFrequencia} />
+                    <SimpleTable title="Campos preenchidos" data={relatorio.camposPreenchidos} />
+                  </div>
+                </div>
+              )}
+            </Card>
+          </section>
+
           <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 text-xs text-slate-600">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span>© {new Date().getFullYear()} • Sistema de Retenção de Alunos</span>
