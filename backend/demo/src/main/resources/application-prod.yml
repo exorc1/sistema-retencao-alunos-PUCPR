@@ -1,19 +1,18 @@
 server:
-  port: ${PORT:8081}
+  port: ${PORT:8080}
 
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-    driver-class-name: org.postgresql.Driver
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/retencao}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
 
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: false
+    show-sql: true
 
 app:
   jwt:
-    secret: ${JWT_SECRET=FXRI/OrcS4qZ5bV7XUVzyq9oKEn3rZHeD02qdCwq8qc=}
-    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    secret: ${JWT_SECRET=47E1V4X6H3RJHaPv3jbV6CfhxbUGnK6Ww+Qt9G2s8OM=}
+    expiration: 86400000
