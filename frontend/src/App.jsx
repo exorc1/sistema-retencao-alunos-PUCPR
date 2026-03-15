@@ -822,10 +822,6 @@ export default function App() {
             </Button>
           </form>
 
-          <div className="mt-4 text-xs text-slate-500">
-            Admin inicial: <b>admin</b> / <b>admin123</b>
-          </div>
-
           {toast ? (
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
               {toast}
