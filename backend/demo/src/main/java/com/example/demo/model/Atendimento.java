@@ -52,11 +52,15 @@ public class Atendimento {
 
     @Column(columnDefinition = "TEXT")
     private String proposta;
+
     private String prazoTrancamento;
     private String prazoCancelamento;
 
     @Column(columnDefinition = "TEXT")
     private String fechamento;
+
+    private String atendenteUsername;
+    private String atendenteNome;
 
     private LocalDateTime criadoEm;
 
@@ -296,6 +300,22 @@ public class Atendimento {
 
     public void setFechamento(String fechamento) {
         this.fechamento = fechamento;
+    }
+
+    public String getAtendenteUsername() {
+        return atendenteUsername;
+    }
+
+    public void setAtendenteUsername(String atendenteUsername) {
+        this.atendenteUsername = atendenteUsername;
+    }
+
+    public String getAtendenteNome() {
+        return atendenteNome;
+    }
+
+    public void setAtendenteNome(String atendenteNome) {
+        this.atendenteNome = atendenteNome;
     }
 
     public LocalDateTime getCriadoEm() {

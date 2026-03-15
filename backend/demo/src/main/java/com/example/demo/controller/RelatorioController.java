@@ -5,9 +5,7 @@ import com.example.demo.repository.AtendimentoRepository;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,32 +46,24 @@ public class RelatorioController {
         out.put("porMotivoSolicitacao", agrupar(lista, Atendimento::getMotivoSolicitacao));
         out.put("porCurso", agrupar(lista, Atendimento::getCurso));
         out.put("porNotas", agrupar(lista, Atendimento::getNotas));
-        out.put("porFrequencia", agrupar(lista, Atendimento::getRjo));
-
-        Map<String, Long> preenchimento = new LinkedHashMap<>();
-        preenchimento.put("diagnosticoExterno", contarPreenchidos(lista, Atendimento::getDiagnosticoExterno));
-        preenchimento.put("diagnosticoInterno", contarPreenchidos(lista, Atendimento::getDiagnosticoInterno));
-        preenchimento.put("relacaoCurso", contarPreenchidos(lista, Atendimento::getRelacaoCurso));
-        preenchimento.put("proposta", contarPreenchidos(lista, Atendimento::getProposta));
-        preenchimento.put("fechamento", contarPreenchidos(lista, Atendimento::getFechamento));
-        preenchimento.put("retornoResponsavelEm", (long) lista.stream().filter(a -> a.getRetornoResponsavelEm() != null).count());
-        preenchimento.put("rjoDetalhes", contarPreenchidos(lista, Atendimento::getRjoDetalhes));
-        preenchimento.put("situacaoAcademica", contarPreenchidos(lista, Atendimento::getSituacaoAcademica));
-        out.put("camposPreenchidos", preenchimento);
+        out.put("porRjo", agrupar(lista, Atendimento::getRjo));
+        out.put("porAtendente", agrupar(lista, Atendimento::getAtendenteNome));
 
         return out;
     }
 
     @GetMapping(value = "/exportar.csv", produces = "text/csv; charset=UTF-8")
     public ResponseEntity<byte[]> exportarCsv() {
-        List<Atendimento> lista = repository.findAll();
+        List<Atendimento> lista = repository.findAllByOrderByCriadoEmDesc();
 
         StringBuilder sb = new StringBuilder();
         sb.append('\uFEFF');
-        sb.append("ID;Tipo de curso;Nome do aluno;Número de matrícula;Curso;Período;Gravação;Data de nascimento;Idade;Menor de idade;Responsável próximo;Retorno responsável em;Diagnóstico externo;Tipo da solicitação;Motivo da solicitação;Diagnóstico interno;Relação com o curso;Notas;Frequência;Observações acadêmicas;Continuar com o curso;Situação acadêmica;Qtd trancamentos;Último trancamento;Trancar sem perder benefício;Proposta;Prazo trancamento;Prazo cancelamento;Fechamento;Criado em\n");
+        sb.append("ID;Atendente;Username atendente;Tipo de curso;Nome do aluno;Número de matrícula;Curso;Período;Gravação;Data de nascimento;Idade;Menor de idade;Responsável próximo;Retorno responsável em;Diagnóstico externo;Tipo da solicitação;Motivo da solicitação;Diagnóstico interno;Relação com o curso;Notas;RJO;Detalhes RJO;Frequência;Situação acadêmica;Qtd trancamentos;Último trancamento;Trancar sem perder benefício;Proposta;Prazo trancamento;Prazo cancelamento;Fechamento;Criado em\n");
 
         for (Atendimento a : lista) {
             sb.append(csv(a.getId())).append(';')
+              .append(csv(a.getAtendenteNome())).append(';')
+              .append(csv(a.getAtendenteUsername())).append(';')
               .append(csv(a.getTipoCurso())).append(';')
               .append(csv(a.getNomeCompletoAluno())).append(';')
               .append(csv(a.getNumeroMatricula())).append(';')
@@ -113,43 +103,19 @@ public class RelatorioController {
     }
 
     @GetMapping("/exportar.xlsx")
-    public ResponseEntity<byte[]> exportarXlsx() throws Exception {
-        List<Atendimento> lista = repository.findAll();
+    public ResponseEntity<byte[]> exportarXlsx() {
+        List<Atendimento> lista = repository.findAllByOrderByCriadoEmDesc();
 
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Atendimentos");
 
             String[] headers = {
-                    "ID",
-                    "Tipo de curso",
-                    "Nome do aluno",
-                    "Número de matrícula",
-                    "Curso",
-                    "Período",
-                    "Gravação",
-                    "Data de nascimento",
-                    "Idade",
-                    "Menor de idade",
-                    "Responsável próximo",
-                    "Retorno responsável em",
-                    "Diagnóstico externo",
-                    "Tipo da solicitação",
-                    "Motivo da solicitação",
-                    "Diagnóstico interno",
-                    "Relação com o curso",
-                    "Notas",
-                    "Frequência",
-                    "Observações acadêmicas",
-                    "Continuar com o curso",
-                    "Situação acadêmica",
-                    "Qtd trancamentos",
-                    "Último trancamento",
-                    "Trancar sem perder benefício",
-                    "Proposta",
-                    "Prazo trancamento",
-                    "Prazo cancelamento",
-                    "Fechamento",
-                    "Criado em"
+                    "ID", "Atendente", "Username atendente", "Tipo de curso", "Nome do aluno", "Número de matrícula", "Curso",
+                    "Período", "Gravação", "Data de nascimento", "Idade", "Menor de idade", "Responsável próximo",
+                    "Retorno responsável em", "Diagnóstico externo", "Tipo da solicitação", "Motivo da solicitação",
+                    "Diagnóstico interno", "Relação com o curso", "Notas", "RJO", "Detalhes RJO", "Frequência",
+                    "Situação acadêmica", "Qtd trancamentos", "Último trancamento", "Trancar sem perder benefício",
+                    "Proposta", "Prazo trancamento", "Prazo cancelamento", "Fechamento", "Criado em"
             };
 
             Row headerRow = sheet.createRow(0);
@@ -157,40 +123,42 @@ public class RelatorioController {
                 headerRow.createCell(i).setCellValue(headers[i]);
             }
 
-            int rowIdx = 1;
+            int rowIndex = 1;
             for (Atendimento a : lista) {
-                Row row = sheet.createRow(rowIdx++);
-
-                row.createCell(0).setCellValue(valor(a.getId()));
-                row.createCell(1).setCellValue(valor(a.getTipoCurso()));
-                row.createCell(2).setCellValue(valor(a.getNomeCompletoAluno()));
-                row.createCell(3).setCellValue(valor(a.getNumeroMatricula()));
-                row.createCell(4).setCellValue(valor(a.getCurso()));
-                row.createCell(5).setCellValue(valor(a.getPeriodo()));
-                row.createCell(6).setCellValue(valor(a.getAtendimentoGravado()));
-                row.createCell(7).setCellValue(valor(a.getDataNascimento()));
-                row.createCell(8).setCellValue(valor(a.getIdade()));
-                row.createCell(9).setCellValue(valor(a.getMenorDeIdade()));
-                row.createCell(10).setCellValue(valor(a.getResponsavelProximo()));
-                row.createCell(11).setCellValue(valor(a.getRetornoResponsavelEm()));
-                row.createCell(12).setCellValue(valor(a.getDiagnosticoExterno()));
-                row.createCell(13).setCellValue(valor(a.getTipoSolicitacao()));
-                row.createCell(14).setCellValue(valor(a.getMotivoSolicitacao()));
-                row.createCell(15).setCellValue(valor(a.getDiagnosticoInterno()));
-                row.createCell(16).setCellValue(valor(a.getRelacaoCurso()));
-                row.createCell(17).setCellValue(valor(a.getNotas()));
-                row.createCell(18).setCellValue(valor(a.getRjo()));
-                row.createCell(19).setCellValue(valor(a.getRjoDetalhes()));
-                row.createCell(20).setCellValue(valor(a.getFrequencia()));
-                row.createCell(21).setCellValue(valor(a.getSituacaoAcademica()));
-                row.createCell(22).setCellValue(valor(a.getQtdTrancamentos()));
-                row.createCell(23).setCellValue(valor(a.getUltimoTrancamento()));
-                row.createCell(24).setCellValue(valor(a.getTrancarSemPerderBeneficio()));
-                row.createCell(25).setCellValue(valor(a.getProposta()));
-                row.createCell(26).setCellValue(valor(a.getPrazoTrancamento()));
-                row.createCell(27).setCellValue(valor(a.getPrazoCancelamento()));
-                row.createCell(28).setCellValue(valor(a.getFechamento()));
-                row.createCell(29).setCellValue(valor(a.getCriadoEm()));
+                Row row = sheet.createRow(rowIndex++);
+                int c = 0;
+                row.createCell(c++).setCellValue(valor(a.getId()));
+                row.createCell(c++).setCellValue(valor(a.getAtendenteNome()));
+                row.createCell(c++).setCellValue(valor(a.getAtendenteUsername()));
+                row.createCell(c++).setCellValue(valor(a.getTipoCurso()));
+                row.createCell(c++).setCellValue(valor(a.getNomeCompletoAluno()));
+                row.createCell(c++).setCellValue(valor(a.getNumeroMatricula()));
+                row.createCell(c++).setCellValue(valor(a.getCurso()));
+                row.createCell(c++).setCellValue(valor(a.getPeriodo()));
+                row.createCell(c++).setCellValue(valor(a.getAtendimentoGravado()));
+                row.createCell(c++).setCellValue(valor(a.getDataNascimento()));
+                row.createCell(c++).setCellValue(valor(a.getIdade()));
+                row.createCell(c++).setCellValue(valor(a.getMenorDeIdade()));
+                row.createCell(c++).setCellValue(valor(a.getResponsavelProximo()));
+                row.createCell(c++).setCellValue(valor(a.getRetornoResponsavelEm()));
+                row.createCell(c++).setCellValue(valor(a.getDiagnosticoExterno()));
+                row.createCell(c++).setCellValue(valor(a.getTipoSolicitacao()));
+                row.createCell(c++).setCellValue(valor(a.getMotivoSolicitacao()));
+                row.createCell(c++).setCellValue(valor(a.getDiagnosticoInterno()));
+                row.createCell(c++).setCellValue(valor(a.getRelacaoCurso()));
+                row.createCell(c++).setCellValue(valor(a.getNotas()));
+                row.createCell(c++).setCellValue(valor(a.getRjo()));
+                row.createCell(c++).setCellValue(valor(a.getRjoDetalhes()));
+                row.createCell(c++).setCellValue(valor(a.getFrequencia()));
+                row.createCell(c++).setCellValue(valor(a.getSituacaoAcademica()));
+                row.createCell(c++).setCellValue(valor(a.getQtdTrancamentos()));
+                row.createCell(c++).setCellValue(valor(a.getUltimoTrancamento()));
+                row.createCell(c++).setCellValue(valor(a.getTrancarSemPerderBeneficio()));
+                row.createCell(c++).setCellValue(valor(a.getProposta()));
+                row.createCell(c++).setCellValue(valor(a.getPrazoTrancamento()));
+                row.createCell(c++).setCellValue(valor(a.getPrazoCancelamento()));
+                row.createCell(c++).setCellValue(valor(a.getFechamento()));
+                row.createCell(c++).setCellValue(valor(a.getCriadoEm()));
             }
 
             for (int i = 0; i < headers.length; i++) {
@@ -203,41 +171,24 @@ public class RelatorioController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=relatorio-atendimentos.xlsx")
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .body(out.toByteArray());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
         }
     }
 
-    private Map<String, Long> agrupar(List<Atendimento> lista, Function<Atendimento, String> getter) {
+    private Map<String, Long> agrupar(List<Atendimento> lista, Function<Atendimento, String> fn) {
         return lista.stream()
-                .map(getter)
-                .map(this::normalizarChave)
-                .collect(Collectors.groupingBy(Function.identity(), LinkedHashMap::new, Collectors.counting()));
+                .map(fn)
+                .map(v -> (v == null || v.isBlank()) ? "Não informado" : v)
+                .collect(Collectors.groupingBy(v -> v, LinkedHashMap::new, Collectors.counting()));
     }
 
-    private long contarPreenchidos(List<Atendimento> lista, Function<Atendimento, String> getter) {
-        return lista.stream()
-                .map(getter)
-                .filter(this::textoPreenchido)
-                .count();
+    private String csv(Object valor) {
+        if (valor == null) return "";
+        return String.valueOf(valor).replace(";", ",").replace("\n", " ").replace("\r", " ");
     }
 
-    private boolean textoPreenchido(String s) {
-        return s != null && !s.trim().isEmpty() && !"Selecione".equalsIgnoreCase(s.trim());
-    }
-
-    private String normalizarChave(String s) {
-        if (s == null || s.trim().isEmpty()) return "Não informado";
-        if ("Selecione".equalsIgnoreCase(s.trim())) return "Não informado";
-        return s.trim();
-    }
-
-    private String csv(Object value) {
-        if (value == null) return "";
-        String s = String.valueOf(value);
-        s = s.replace("\"", "\"\"");
-        return "\"" + s + "\"";
-    }
-
-    private String valor(Object value) {
-        return value == null ? "" : String.valueOf(value);
+    private String valor(Object valor) {
+        return valor == null ? "" : String.valueOf(valor);
     }
 }

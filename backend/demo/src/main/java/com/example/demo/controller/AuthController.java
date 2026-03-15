@@ -1,15 +1,13 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.LoginRequest;
-import com.example.demo.dto.LoginResponse;
+import com.example.demo.dto.*;
 import com.example.demo.model.TokenBlacklist;
 import com.example.demo.model.Usuario;
 import com.example.demo.repository.TokenBlacklistRepository;
 import com.example.demo.repository.UsuarioRepository;
 import com.example.demo.security.JwtService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -83,7 +81,8 @@ public class AuthController {
                 Map.of(
                         "nome", u.getNome(),
                         "username", u.getUsername(),
-                        "role", u.getRole().name()
+                        "role", u.getRole().name(),
+                        "ativo", u.getAtivo()
                 )
         );
     }

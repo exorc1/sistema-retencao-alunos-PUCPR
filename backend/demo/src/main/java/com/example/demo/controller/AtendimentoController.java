@@ -1,11 +1,12 @@
 package com.example.demo.controller;
 
-import com.example.demo.model.Atendimento;
-import com.example.demo.repository.AtendimentoRepository;
+import com.example.demo.model.*;
+import com.example.demo.repository.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -14,32 +15,49 @@ import java.util.List;
 @PreAuthorize("hasAnyRole('ADMIN','ATENDENTE')")
 public class AtendimentoController {
 
-    private final AtendimentoRepository repository;
+    private final AtendimentoRepository atendimentoRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    public AtendimentoController(AtendimentoRepository repository) {
-        this.repository = repository;
+    public AtendimentoController(AtendimentoRepository atendimentoRepository, UsuarioRepository usuarioRepository) {
+        this.atendimentoRepository = atendimentoRepository;
+        this.usuarioRepository = usuarioRepository;
     }
 
     @GetMapping
-    public List<Atendimento> listar() {
-        return repository.findAll();
+    public List<Atendimento> listar(Principal principal) {
+        Usuario usuario = usuarioLogado(principal);
+        if (usuario.getRole() == Role.ADMIN) {
+            return atendimentoRepository.findAllByOrderByCriadoEmDesc();
+        }
+        return atendimentoRepository.findByAtendenteUsernameOrderByCriadoEmDesc(usuario.getUsername());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Atendimento> buscarPorId(@PathVariable Long id) {
-        return repository.findById(id)
+    public ResponseEntity<Atendimento> buscarPorId(@PathVariable Long id, Principal principal) {
+        Usuario usuario = usuarioLogado(principal);
+
+        return atendimentoRepository.findById(id)
+                .filter(atendimento -> podeAcessar(usuario, atendimento))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public Atendimento criar(@RequestBody Atendimento atendimento) {
-        return repository.save(atendimento);
+    public Atendimento criar(@RequestBody Atendimento atendimento, Principal principal) {
+        Usuario usuario = usuarioLogado(principal);
+
+        atendimento.setAtendenteUsername(usuario.getUsername());
+        atendimento.setAtendenteNome(usuario.getNome());
+
+        return atendimentoRepository.save(atendimento);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Atendimento> atualizar(@PathVariable Long id, @RequestBody Atendimento dados) {
-        return repository.findById(id)
+    public ResponseEntity<Atendimento> atualizar(@PathVariable Long id, @RequestBody Atendimento dados, Principal principal) {
+        Usuario usuario = usuarioLogado(principal);
+
+        return atendimentoRepository.findById(id)
+                .filter(atendimento -> podeEditar(usuario, atendimento))
                 .map(existente -> {
                     existente.setTipoCurso(dados.getTipoCurso());
                     existente.setNomeCompletoAluno(dados.getNomeCompletoAluno());
@@ -76,18 +94,32 @@ public class AtendimentoController {
 
                     existente.setFechamento(dados.getFechamento());
 
-                    return ResponseEntity.ok(repository.save(existente));
+                    return ResponseEntity.ok(atendimentoRepository.save(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> remover(@PathVariable Long id) {
-        return repository.findById(id)
+        return atendimentoRepository.findById(id)
                 .map(existente -> {
-                    repository.delete(existente);
+                    atendimentoRepository.delete(existente);
                     return ResponseEntity.noContent().<Void>build();
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private Usuario usuarioLogado(Principal principal) {
+        return usuarioRepository.findByUsername(principal.getName()).orElseThrow();
+    }
+
+    private boolean podeAcessar(Usuario usuario, Atendimento atendimento) {
+        return usuario.getRole() == Role.ADMIN
+                || usuario.getUsername().equals(atendimento.getAtendenteUsername());
+    }
+
+    private boolean podeEditar(Usuario usuario, Atendimento atendimento) {
+        return podeAcessar(usuario, atendimento);
     }
 }

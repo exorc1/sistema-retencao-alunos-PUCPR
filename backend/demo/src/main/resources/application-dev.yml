@@ -20,5 +20,10 @@ spring:
 
 app:
   jwt:
-    secret: 12345678901234567890123456789012
+    secret: 9e7bcb7c0c0b44cdbdd6b4a8a0e0a3cbb0e4baf7d9a63c2e3c8f8e4d4a1e7c2a
     expiration: 86400000
+  bootstrap:
+    admin:
+      username: admin
+      password: admin123
+      nome: Administrador

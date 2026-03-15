@@ -17,3 +17,8 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration: 86400000
+  bootstrap:
+    admin:
+      username: ${APP_BOOTSTRAP_ADMIN_USERNAME:admin}
+      password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:admin123}
+      nome: ${APP_BOOTSTRAP_ADMIN_NOME:Administrador}
