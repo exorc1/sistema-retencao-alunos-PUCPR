@@ -12,14 +12,12 @@ public class Atendimento {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Formulário inicial
     private String tipoCurso;
     private String nomeCompletoAluno;
     private String numeroMatricula;
     private String curso;
     private String periodo;
 
-    // Gravação / nascimento
     private Boolean atendimentoGravado;
     private LocalDate dataNascimento;
     private Integer idade;
@@ -27,23 +25,18 @@ public class Atendimento {
     private String responsavelProximo;
     private LocalDateTime retornoResponsavelEm;
 
-    // Diagnóstico externo
     @Column(columnDefinition = "TEXT")
     private String diagnosticoExterno;
 
-    // Tipo / motivo
     private String tipoSolicitacao;
     private String motivoSolicitacao;
 
-    // Diagnóstico interno
     @Column(columnDefinition = "TEXT")
     private String diagnosticoInterno;
 
-    // Relação com o curso
     @Column(columnDefinition = "TEXT")
     private String relacaoCurso;
 
-    // Informações acadêmicas
     private String notas;
     private String rjo;
 
@@ -53,18 +46,15 @@ public class Atendimento {
     private String frequencia;
     private String situacaoAcademica;
 
-    // Histórico
     private Integer qtdTrancamentos;
     private String ultimoTrancamento;
     private String trancarSemPerderBeneficio;
 
-    // Proposta / solução
     @Column(columnDefinition = "TEXT")
     private String proposta;
     private String prazoTrancamento;
     private String prazoCancelamento;
 
-    // Etapa final
     @Column(columnDefinition = "TEXT")
     private String fechamento;
 

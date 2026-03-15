@@ -11,6 +11,9 @@ const RELATORIO_RESUMO_URL = `${API_BASE}/api/relatorios/atendimentos/resumo`;
 const RELATORIO_CSV_URL = `${API_BASE}/api/relatorios/atendimentos/exportar.csv`;
 const RELATORIO_XLSX_URL = `${API_BASE}/api/relatorios/atendimentos/exportar.xlsx`;
 
+const AUTH_LOGIN_URL = `${API_BASE}/api/auth/login`;
+const AUTH_LOGOUT_URL = `${API_BASE}/api/auth/logout`;
+
 function calcularIdade(dataISO) {
   if (!dataISO) return "";
   const hoje = new Date();
@@ -53,7 +56,7 @@ function formatDateTimeBR(isoOrDateLike) {
   }).format(d);
 }
 
-const steps = [
+const baseSteps = [
   { id: "inicial", label: "Formulário Inicial" },
   { id: "gravacao", label: "Gravação / Nascimento" },
   { id: "diagnosticoExterno", label: "Diagnóstico Externo" },
@@ -265,18 +268,34 @@ function SimpleTable({ title, data }) {
 }
 
 export default function App() {
+  const [auth, setAuth] = useState({
+    token: localStorage.getItem("token") || "",
+    role: localStorage.getItem("role") || "",
+    nome: localStorage.getItem("nome") || "",
+    username: localStorage.getItem("username") || "",
+  });
+
+  const [loginForm, setLoginForm] = useState({
+    username: "",
+    senha: "",
+  });
+
   const [activeStep, setActiveStep] = useState("inicial");
   const [form, setForm] = useState(initialForm);
-
   const [medicinaPrimeiroPeriodo, setMedicinaPrimeiroPeriodo] = useState("Selecione");
-
   const [atendimentos, setAtendimentos] = useState([]);
   const [relatorio, setRelatorio] = useState(null);
-
   const [loading, setLoading] = useState(false);
   const [loadingRelatorio, setLoadingRelatorio] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [toast, setToast] = useState("");
+
+  const isAdmin = auth.role === "ADMIN";
+
+  const steps = useMemo(
+    () => baseSteps.filter((s) => (s.id === "relatorios" ? isAdmin : true)),
+    [isAdmin]
+  );
 
   const periodoNumero = useMemo(() => extrairNumeroPeriodo(form.periodo), [form.periodo]);
   const isMed = useMemo(() => cursoEhMedicina(form.curso), [form.curso]);
@@ -304,9 +323,79 @@ export default function App() {
       : "Maior de idade.";
   }, [form.menorDeIdade]);
 
+  function authHeaders(extra = {}) {
+    return {
+      ...extra,
+      Authorization: `Bearer ${auth.token}`,
+    };
+  }
+
+  async function fazerLogin(e) {
+    e?.preventDefault?.();
+
+    try {
+      const r = await fetch(AUTH_LOGIN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(loginForm),
+      });
+
+      if (!r.ok) {
+        const t = await r.text().catch(() => "");
+        throw new Error(`Falha no login (${r.status}): ${t}`);
+      }
+
+      const data = await r.json();
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("nome", data.nome || "");
+      localStorage.setItem("username", data.username || "");
+
+      setAuth({
+        token: data.token,
+        role: data.role,
+        nome: data.nome || "",
+        username: data.username || "",
+      });
+
+      setToast("Login realizado com sucesso.");
+      setTimeout(() => setToast(""), 2500);
+    } catch (e) {
+      console.error(e);
+      setToast(e?.message || "Erro ao fazer login.");
+      setTimeout(() => setToast(""), 3000);
+    }
+  }
+
+  async function fazerLogout() {
+    try {
+      if (auth.token) {
+        await fetch(AUTH_LOGOUT_URL, {
+          method: "POST",
+          headers: authHeaders(),
+        }).catch(() => {});
+      }
+    } finally {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("nome");
+      localStorage.removeItem("username");
+
+      setAuth({ token: "", role: "", nome: "", username: "" });
+      setLoginForm({ username: "", senha: "" });
+      setAtendimentos([]);
+      setRelatorio(null);
+      setEditingId(null);
+      setForm(initialForm);
+    }
+  }
+
   async function carregarAtendimentos() {
     try {
-      const r = await fetch(API_URL);
+      const r = await fetch(API_URL, {
+        headers: authHeaders(),
+      });
       if (!r.ok) {
         const t = await r.text().catch(() => "");
         throw new Error(`Erro ao carregar (${r.status}): ${t}`);
@@ -322,9 +411,12 @@ export default function App() {
   }
 
   async function carregarRelatorio() {
+    if (!isAdmin) return;
     try {
       setLoadingRelatorio(true);
-      const r = await fetch(RELATORIO_RESUMO_URL);
+      const r = await fetch(RELATORIO_RESUMO_URL, {
+        headers: authHeaders(),
+      });
       if (!r.ok) {
         const t = await r.text().catch(() => "");
         throw new Error(`Erro ao carregar relatório (${r.status}): ${t}`);
@@ -350,9 +442,11 @@ export default function App() {
   }
 
   useEffect(() => {
-    carregarAtendimentos();
-    carregarRelatorio();
-  }, []);
+    if (auth.token) {
+      carregarAtendimentos();
+      if (isAdmin) carregarRelatorio();
+    }
+  }, [auth.token, isAdmin]);
 
   useEffect(() => {
     if (bloqueiaTrancamento && form.tipoSolicitacao === "Trancamento") {
@@ -420,7 +514,7 @@ export default function App() {
 
       const r = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(payload),
       });
 
@@ -432,7 +526,7 @@ export default function App() {
       setToast(isEdit ? "Atendimento atualizado com sucesso." : "Atendimento salvo com sucesso.");
       resetForm();
       await carregarAtendimentos();
-      await carregarRelatorio();
+      if (isAdmin) await carregarRelatorio();
       scrollTo("salvos");
     } catch (e) {
       console.error(e);
@@ -493,20 +587,69 @@ export default function App() {
   async function remover(id) {
     if (!window.confirm("Tem certeza que deseja remover?")) return;
     try {
-      const r = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+      const r = await fetch(`${API_URL}/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
       if (!r.ok) {
         const t = await r.text().catch(() => "");
         throw new Error(`Falha ao remover (${r.status}): ${t}`);
       }
       setToast("Removido com sucesso.");
       await carregarAtendimentos();
-      await carregarRelatorio();
+      if (isAdmin) await carregarRelatorio();
     } catch (e) {
       console.error(e);
       setToast(e?.message || "Erro ao remover.");
     } finally {
       setTimeout(() => setToast(""), 2500);
     }
+  }
+
+  if (!auth.token) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h1 className="text-xl font-bold text-slate-900">Entrar no sistema</h1>
+          <p className="mt-1 text-sm text-slate-600">Use seu usuário e senha para acessar.</p>
+
+          <form className="mt-6 space-y-4" onSubmit={fazerLogin}>
+            <div>
+              <Label>Usuário</Label>
+              <Input
+                value={loginForm.username}
+                onChange={(e) => setLoginForm((p) => ({ ...p, username: e.target.value }))}
+                placeholder="Seu usuário"
+              />
+            </div>
+
+            <div>
+              <Label>Senha</Label>
+              <Input
+                type="password"
+                value={loginForm.senha}
+                onChange={(e) => setLoginForm((p) => ({ ...p, senha: e.target.value }))}
+                placeholder="Sua senha"
+              />
+            </div>
+
+            <Button type="submit" className="w-full">
+              Entrar
+            </Button>
+          </form>
+
+          <div className="mt-4 text-xs text-slate-500">
+            Admin inicial: <b>admin</b> / <b>admin123</b>
+          </div>
+
+          {toast ? (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
+              {toast}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -520,21 +663,29 @@ export default function App() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-black tracking-tight">Sistema de Retenção de Alunos</h1>
-                <Pill>Modelo institucional</Pill>
+                <Pill>{auth.role}</Pill>
               </div>
               <p className="text-xs text-slate-600">Atendimento / Retenção — formulário + histórico</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={carregarRelatorio} disabled={loadingRelatorio}>
-              {loadingRelatorio ? "Atualizando..." : "Atualizar Relatório"}
-            </Button>
-            <Button variant="outline" onClick={exportarExcel}>
-              Exportar Excel
-            </Button>
-            <Button variant="outline" onClick={exportarCsv}>
-              CSV
+            {isAdmin && (
+              <>
+                <Button variant="outline" onClick={carregarRelatorio} disabled={loadingRelatorio}>
+                  {loadingRelatorio ? "Atualizando..." : "Atualizar Relatório"}
+                </Button>
+                <Button variant="outline" onClick={exportarExcel}>
+                  Exportar Excel
+                </Button>
+                <Button variant="outline" onClick={exportarCsv}>
+                  CSV
+                </Button>
+              </>
+            )}
+
+            <Button variant="outline" onClick={fazerLogout}>
+              Sair
             </Button>
           </div>
         </div>
@@ -565,7 +716,9 @@ export default function App() {
 
           <div className="mt-5 rounded-2xl bg-slate-50 p-3">
             <p className="text-xs font-bold text-slate-700">Status</p>
-            <p className="mt-1 text-xs text-slate-600">{editingId ? `Editando atendimento #${editingId}` : "Novo atendimento"}</p>
+            <p className="mt-1 text-xs text-slate-600">
+              {editingId ? `Editando atendimento #${editingId}` : "Novo atendimento"}
+            </p>
             <div className="mt-3 flex gap-2">
               <Button variant="outline" className="flex-1" onClick={resetForm} disabled={loading}>
                 Limpar
@@ -574,6 +727,13 @@ export default function App() {
                 {loading ? "Salvando..." : editingId ? "Atualizar" : "Gravar e Enviar"}
               </Button>
             </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
+            <p className="text-xs font-bold text-slate-700">Usuário</p>
+            <p className="mt-1 text-xs text-slate-600">
+              {auth.nome || auth.username} ({auth.role})
+            </p>
           </div>
 
           <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
@@ -953,44 +1113,46 @@ export default function App() {
             </Card>
           </section>
 
-          <section id="relatorios">
-            <Card
-              title="Relatórios"
-              subtitle="Resumo geral dos atendimentos e exportação completa."
-              right={
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={carregarRelatorio} disabled={loadingRelatorio}>
-                    {loadingRelatorio ? "Atualizando..." : "Atualizar"}
-                  </Button>
-                  <Button onClick={exportarExcel}>Exportar Excel</Button>
-                  <Button variant="outline" onClick={exportarCsv}>CSV</Button>
-                </div>
-              }
-            >
-              {!relatorio ? (
-                <div className="text-sm text-slate-500">Relatório indisponível no momento.</div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                    <StatCard label="Total de atendimentos" value={relatorio.totalAtendimentos} />
-                    <StatCard label="Menores de idade" value={relatorio.totalMenores} />
-                    <StatCard label="Com retorno agendado" value={relatorio.totalComRetornoAgendado} />
-                    <StatCard label="Retornos vencidos" value={relatorio.totalRetornosVencidos} />
+          {isAdmin && (
+            <section id="relatorios">
+              <Card
+                title="Relatórios"
+                subtitle="Resumo geral dos atendimentos e exportação completa."
+                right={
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={carregarRelatorio} disabled={loadingRelatorio}>
+                      {loadingRelatorio ? "Atualizando..." : "Atualizar"}
+                    </Button>
+                    <Button onClick={exportarExcel}>Exportar Excel</Button>
+                    <Button variant="outline" onClick={exportarCsv}>CSV</Button>
                   </div>
+                }
+              >
+                {!relatorio ? (
+                  <div className="text-sm text-slate-500">Relatório indisponível no momento.</div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                      <StatCard label="Total de atendimentos" value={relatorio.totalAtendimentos} />
+                      <StatCard label="Menores de idade" value={relatorio.totalMenores} />
+                      <StatCard label="Com retorno agendado" value={relatorio.totalComRetornoAgendado} />
+                      <StatCard label="Retornos vencidos" value={relatorio.totalRetornosVencidos} />
+                    </div>
 
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <SimpleTable title="Por tipo de curso" data={relatorio.porTipoCurso} />
-                    <SimpleTable title="Por tipo de solicitação" data={relatorio.porTipoSolicitacao} />
-                    <SimpleTable title="Por motivo" data={relatorio.porMotivoSolicitacao} />
-                    <SimpleTable title="Por curso" data={relatorio.porCurso} />
-                    <SimpleTable title="Por notas" data={relatorio.porNotas} />
-                    <SimpleTable title="Por frequência" data={relatorio.porFrequencia} />
-                    <SimpleTable title="Campos preenchidos" data={relatorio.camposPreenchidos} />
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <SimpleTable title="Por tipo de curso" data={relatorio.porTipoCurso} />
+                      <SimpleTable title="Por tipo de solicitação" data={relatorio.porTipoSolicitacao} />
+                      <SimpleTable title="Por motivo" data={relatorio.porMotivoSolicitacao} />
+                      <SimpleTable title="Por curso" data={relatorio.porCurso} />
+                      <SimpleTable title="Por notas" data={relatorio.porNotas} />
+                      <SimpleTable title="Por frequência" data={relatorio.porFrequencia} />
+                      <SimpleTable title="Campos preenchidos" data={relatorio.camposPreenchidos} />
+                    </div>
                   </div>
-                </div>
-              )}
-            </Card>
-          </section>
+                )}
+              </Card>
+            </section>
+          )}
 
           <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 text-xs text-slate-600">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

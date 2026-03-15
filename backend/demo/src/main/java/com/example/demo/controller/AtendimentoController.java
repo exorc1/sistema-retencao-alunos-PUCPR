@@ -3,6 +3,7 @@ package com.example.demo.controller;
 import com.example.demo.model.Atendimento;
 import com.example.demo.repository.AtendimentoRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/atendimentos")
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('ADMIN','ATENDENTE')")
 public class AtendimentoController {
 
     private final AtendimentoRepository repository;
@@ -53,10 +55,8 @@ public class AtendimentoController {
                     existente.setRetornoResponsavelEm(dados.getRetornoResponsavelEm());
 
                     existente.setDiagnosticoExterno(dados.getDiagnosticoExterno());
-
                     existente.setTipoSolicitacao(dados.getTipoSolicitacao());
                     existente.setMotivoSolicitacao(dados.getMotivoSolicitacao());
-
                     existente.setDiagnosticoInterno(dados.getDiagnosticoInterno());
                     existente.setRelacaoCurso(dados.getRelacaoCurso());
 
