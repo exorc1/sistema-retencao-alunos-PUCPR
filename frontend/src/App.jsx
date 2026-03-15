@@ -1,11 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 /**
- * ✅ Render: defina VITE_API_URL = https://SEU-BACKEND.onrender.com
- * ✅ Local: cai em http://localhost:8081
+ * Render:
+ * VITE_API_URL=https://SEU-BACKEND.onrender.com
+ *
+ * Local:
+ * cai em http://localhost:8081
  */
 const API_BASE_RAW = import.meta.env.VITE_API_URL || "http://localhost:8081";
 const API_BASE = String(API_BASE_RAW).replace(/\/+$/, "");
+
 const API_URL = `${API_BASE}/api/atendimentos`;
 const RELATORIO_RESUMO_URL = `${API_BASE}/api/relatorios/atendimentos/resumo`;
 const RELATORIO_CSV_URL = `${API_BASE}/api/relatorios/atendimentos/exportar.csv`;
@@ -13,6 +17,8 @@ const RELATORIO_XLSX_URL = `${API_BASE}/api/relatorios/atendimentos/exportar.xls
 
 const AUTH_LOGIN_URL = `${API_BASE}/api/auth/login`;
 const AUTH_LOGOUT_URL = `${API_BASE}/api/auth/logout`;
+
+const USUARIOS_URL = `${API_BASE}/api/usuarios`;
 
 function calcularIdade(dataISO) {
   if (!dataISO) return "";
@@ -68,6 +74,7 @@ const baseSteps = [
   { id: "proposta", label: "Proposta / Solução" },
   { id: "etapaFinal", label: "Etapa Final" },
   { id: "salvos", label: "Atendimentos Salvos" },
+  { id: "usuarios", label: "Usuários" },
   { id: "relatorios", label: "Relatórios" },
 ];
 
@@ -96,6 +103,7 @@ const SELECT_MOTIVO = [
 const SELECT_NOTAS = ["Selecione", "Boas", "Médias", "Ruins"];
 const SELECT_QTD_TRANC = ["Selecione", "0", "1", "2", "3", "4"];
 const SELECT_RESPONSAVEL = ["Selecione", "Sim", "Não", "N/A"];
+const SELECT_ROLES = ["ADMIN", "ATENDENTE"];
 
 const PRAZOS = [
   "ATÉ 06/03/2026 - Final do período para solicitação de trancamento de matrícula para o 2º semestre de 2025",
@@ -141,6 +149,14 @@ const initialForm = {
   prazoCancelamento: "",
 
   fechamento: "",
+};
+
+const initialUsuarioForm = {
+  nome: "",
+  username: "",
+  senha: "",
+  role: "ATENDENTE",
+  ativo: true,
 };
 
 function Label({ children }) {
@@ -290,10 +306,20 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [toast, setToast] = useState("");
 
+  const [usuarios, setUsuarios] = useState([]);
+  const [usuarioForm, setUsuarioForm] = useState(initialUsuarioForm);
+  const [editingUsuarioId, setEditingUsuarioId] = useState(null);
+  const [senhaReset, setSenhaReset] = useState({});
+  const [loadingUsuarios, setLoadingUsuarios] = useState(false);
+
   const isAdmin = auth.role === "ADMIN";
 
   const steps = useMemo(
-    () => baseSteps.filter((s) => (s.id === "relatorios" ? isAdmin : true)),
+    () => baseSteps.filter((s) => {
+      if (s.id === "relatorios" && !isAdmin) return false;
+      if (s.id === "usuarios" && !isAdmin) return false;
+      return true;
+    }),
     [isAdmin]
   );
 
@@ -330,6 +356,22 @@ export default function App() {
     };
   }
 
+  function showToast(msg, ms = 3000) {
+    setToast(msg);
+    if (ms > 0) {
+      setTimeout(() => setToast(""), ms);
+    }
+  }
+
+  async function fetchJson(url, options = {}) {
+    const r = await fetch(url, options);
+    if (!r.ok) {
+      const text = await r.text().catch(() => "");
+      throw new Error(text || `Erro ${r.status}`);
+    }
+    return r.json();
+  }
+
   async function fazerLogin(e) {
     e?.preventDefault?.();
 
@@ -359,12 +401,10 @@ export default function App() {
         username: data.username || "",
       });
 
-      setToast("Login realizado com sucesso.");
-      setTimeout(() => setToast(""), 2500);
-    } catch (e) {
-      console.error(e);
-      setToast(e?.message || "Erro ao fazer login.");
-      setTimeout(() => setToast(""), 3000);
+      showToast("Login realizado com sucesso.", 2500);
+    } catch (e2) {
+      console.error(e2);
+      showToast(e2?.message || "Erro ao fazer login.");
     }
   }
 
@@ -386,27 +426,24 @@ export default function App() {
       setLoginForm({ username: "", senha: "" });
       setAtendimentos([]);
       setRelatorio(null);
+      setUsuarios([]);
       setEditingId(null);
+      setEditingUsuarioId(null);
       setForm(initialForm);
+      setUsuarioForm(initialUsuarioForm);
     }
   }
 
   async function carregarAtendimentos() {
     try {
-      const r = await fetch(API_URL, {
+      const data = await fetchJson(API_URL, {
         headers: authHeaders(),
       });
-      if (!r.ok) {
-        const t = await r.text().catch(() => "");
-        throw new Error(`Erro ao carregar (${r.status}): ${t}`);
-      }
-      const data = await r.json();
       setAtendimentos(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error(e);
+    } catch (e2) {
+      console.error(e2);
       setAtendimentos([]);
-      setToast(e?.message || "Falha ao carregar atendimentos.");
-      setTimeout(() => setToast(""), 3000);
+      showToast(e2?.message || "Falha ao carregar atendimentos.");
     }
   }
 
@@ -414,45 +451,84 @@ export default function App() {
     if (!isAdmin) return;
     try {
       setLoadingRelatorio(true);
-      const r = await fetch(RELATORIO_RESUMO_URL, {
+      const data = await fetchJson(RELATORIO_RESUMO_URL, {
         headers: authHeaders(),
       });
-      if (!r.ok) {
-        const t = await r.text().catch(() => "");
-        throw new Error(`Erro ao carregar relatório (${r.status}): ${t}`);
-      }
-      const data = await r.json();
       setRelatorio(data);
-    } catch (e) {
-      console.error(e);
+    } catch (e2) {
+      console.error(e2);
       setRelatorio(null);
-      setToast(e?.message || "Falha ao carregar relatório.");
-      setTimeout(() => setToast(""), 3000);
+      showToast(e2?.message || "Falha ao carregar relatório.");
     } finally {
       setLoadingRelatorio(false);
     }
   }
 
+  async function carregarUsuarios() {
+    if (!isAdmin) return;
+    try {
+      setLoadingUsuarios(true);
+      const data = await fetchJson(USUARIOS_URL, {
+        headers: authHeaders(),
+      });
+      setUsuarios(Array.isArray(data) ? data : []);
+    } catch (e2) {
+      console.error(e2);
+      setUsuarios([]);
+      showToast(e2?.message || "Falha ao carregar usuários.");
+    } finally {
+      setLoadingUsuarios(false);
+    }
+  }
+
+  async function baixarArquivoComToken(url, nomeArquivo) {
+    try {
+      const response = await fetch(url, {
+        headers: authHeaders(),
+      });
+
+      if (!response.ok) {
+        const txt = await response.text().catch(() => "");
+        throw new Error(txt || `Falha ao baixar arquivo (${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = nomeArquivo;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (e2) {
+      console.error(e2);
+      showToast(e2?.message || "Erro ao baixar arquivo.");
+    }
+  }
+
   function exportarCsv() {
-    window.open(RELATORIO_CSV_URL, "_blank");
+    baixarArquivoComToken(RELATORIO_CSV_URL, "relatorio-atendimentos.csv");
   }
 
   function exportarExcel() {
-    window.open(RELATORIO_XLSX_URL, "_blank");
+    baixarArquivoComToken(RELATORIO_XLSX_URL, "relatorio-atendimentos.xlsx");
   }
 
   useEffect(() => {
     if (auth.token) {
       carregarAtendimentos();
-      if (isAdmin) carregarRelatorio();
+      if (isAdmin) {
+        carregarRelatorio();
+        carregarUsuarios();
+      }
     }
   }, [auth.token, isAdmin]);
 
   useEffect(() => {
     if (bloqueiaTrancamento && form.tipoSolicitacao === "Trancamento") {
       setForm((p) => ({ ...p, tipoSolicitacao: "Cancelamento" }));
-      setToast("Medicina no 1º período não permite Trancamento. Ajustei para Cancelamento.");
-      setTimeout(() => setToast(""), 3500);
+      showToast("Medicina no 1º período não permite Trancamento. Ajustei para Cancelamento.", 3500);
     }
   }, [bloqueiaTrancamento, form.tipoSolicitacao]);
 
@@ -479,6 +555,11 @@ export default function App() {
     setEditingId(null);
   }
 
+  function resetUsuarioForm() {
+    setUsuarioForm(initialUsuarioForm);
+    setEditingUsuarioId(null);
+  }
+
   function scrollTo(stepId) {
     setActiveStep(stepId);
     const el = document.getElementById(stepId);
@@ -489,8 +570,7 @@ export default function App() {
     try {
       if (form.menorDeIdade === "Sim" && form.responsavelProximo !== "Sim") {
         if (!form.retornoResponsavelEm) {
-          setToast("Menor de idade sem responsável: informe a data/hora de retorno.");
-          setTimeout(() => setToast(""), 3000);
+          showToast("Menor de idade sem responsável: informe a data/hora de retorno.");
           scrollTo("gravacao");
           return;
         }
@@ -523,17 +603,112 @@ export default function App() {
         throw new Error(`Erro ao salvar (${r.status}): ${t}`);
       }
 
-      setToast(isEdit ? "Atendimento atualizado com sucesso." : "Atendimento salvo com sucesso.");
+      showToast(isEdit ? "Atendimento atualizado com sucesso." : "Atendimento salvo com sucesso.", 2500);
       resetForm();
       await carregarAtendimentos();
       if (isAdmin) await carregarRelatorio();
       scrollTo("salvos");
-    } catch (e) {
-      console.error(e);
-      setToast(e?.message || "Erro ao salvar (veja o console).");
+    } catch (e2) {
+      console.error(e2);
+      showToast(e2?.message || "Erro ao salvar.");
     } finally {
       setLoading(false);
-      setTimeout(() => setToast(""), 2500);
+    }
+  }
+
+  async function salvarUsuario() {
+    try {
+      if (!usuarioForm.username?.trim()) {
+        showToast("Informe o username.");
+        return;
+      }
+
+      if (!editingUsuarioId && !usuarioForm.senha?.trim()) {
+        showToast("Informe a senha.");
+        return;
+      }
+
+      const payload = {
+        nome: usuarioForm.nome,
+        username: usuarioForm.username,
+        role: usuarioForm.role,
+        ativo: usuarioForm.ativo,
+      };
+
+      if (usuarioForm.senha?.trim()) {
+        payload.senha = usuarioForm.senha;
+      }
+
+      const isEdit = !!editingUsuarioId;
+      const url = isEdit ? `${USUARIOS_URL}/${editingUsuarioId}` : USUARIOS_URL;
+      const method = isEdit ? "PUT" : "POST";
+
+      const r = await fetch(url, {
+        method,
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload),
+      });
+
+      if (!r.ok) {
+        const t = await r.text().catch(() => "");
+        throw new Error(`Erro ao salvar usuário (${r.status}): ${t}`);
+      }
+
+      showToast(isEdit ? "Usuário atualizado com sucesso." : "Usuário criado com sucesso.", 2500);
+      resetUsuarioForm();
+      await carregarUsuarios();
+    } catch (e2) {
+      console.error(e2);
+      showToast(e2?.message || "Erro ao salvar usuário.");
+    }
+  }
+
+  async function trocarSenhaUsuario(id) {
+    try {
+      const novaSenha = senhaReset[id];
+      if (!novaSenha?.trim()) {
+        showToast("Informe a nova senha.");
+        return;
+      }
+
+      const r = await fetch(`${USUARIOS_URL}/${id}/senha`, {
+        method: "PUT",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ novaSenha }),
+      });
+
+      if (!r.ok) {
+        const t = await r.text().catch(() => "");
+        throw new Error(`Erro ao trocar senha (${r.status}): ${t}`);
+      }
+
+      setSenhaReset((prev) => ({ ...prev, [id]: "" }));
+      showToast("Senha alterada com sucesso.", 2500);
+    } catch (e2) {
+      console.error(e2);
+      showToast(e2?.message || "Erro ao trocar senha.");
+    }
+  }
+
+  async function excluirUsuario(id) {
+    if (!window.confirm("Tem certeza que deseja excluir este usuário?")) return;
+
+    try {
+      const r = await fetch(`${USUARIOS_URL}/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+
+      if (!r.ok) {
+        const t = await r.text().catch(() => "");
+        throw new Error(`Erro ao excluir usuário (${r.status}): ${t}`);
+      }
+
+      showToast("Usuário removido com sucesso.", 2500);
+      await carregarUsuarios();
+    } catch (e2) {
+      console.error(e2);
+      showToast(e2?.message || "Erro ao excluir usuário.");
     }
   }
 
@@ -584,6 +759,17 @@ export default function App() {
     else setMedicinaPrimeiroPeriodo("Selecione");
   }
 
+  function preencherUsuarioParaEdicao(u) {
+    setEditingUsuarioId(u.id);
+    setUsuarioForm({
+      nome: u.nome ?? "",
+      username: u.username ?? "",
+      senha: "",
+      role: u.role ?? "ATENDENTE",
+      ativo: Boolean(u.ativo),
+    });
+  }
+
   async function remover(id) {
     if (!window.confirm("Tem certeza que deseja remover?")) return;
     try {
@@ -595,14 +781,12 @@ export default function App() {
         const t = await r.text().catch(() => "");
         throw new Error(`Falha ao remover (${r.status}): ${t}`);
       }
-      setToast("Removido com sucesso.");
+      showToast("Removido com sucesso.", 2500);
       await carregarAtendimentos();
       if (isAdmin) await carregarRelatorio();
-    } catch (e) {
-      console.error(e);
-      setToast(e?.message || "Erro ao remover.");
-    } finally {
-      setTimeout(() => setToast(""), 2500);
+    } catch (e2) {
+      console.error(e2);
+      showToast(e2?.message || "Erro ao remover.");
     }
   }
 
@@ -672,6 +856,9 @@ export default function App() {
           <div className="flex items-center gap-2">
             {isAdmin && (
               <>
+                <Button variant="outline" onClick={() => scrollTo("usuarios")}>
+                  Usuários
+                </Button>
                 <Button variant="outline" onClick={carregarRelatorio} disabled={loadingRelatorio}>
                   {loadingRelatorio ? "Atualizando..." : "Atualizar Relatório"}
                 </Button>
@@ -1099,9 +1286,11 @@ export default function App() {
                               >
                                 Editar
                               </Button>
-                              <Button variant="danger" onClick={() => remover(a.id)}>
-                                Remover
-                              </Button>
+                              {isAdmin && (
+                                <Button variant="danger" onClick={() => remover(a.id)}>
+                                  Remover
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1112,6 +1301,157 @@ export default function App() {
               </div>
             </Card>
           </section>
+
+          {isAdmin && (
+            <section id="usuarios">
+              <Card
+                title="Usuários"
+                subtitle="Gestão de usuários do sistema."
+                right={
+                  <Button variant="subtle" onClick={carregarUsuarios} disabled={loadingUsuarios}>
+                    {loadingUsuarios ? "Atualizando..." : "Atualizar"}
+                  </Button>
+                }
+              >
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[380px_1fr]">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <h4 className="text-sm font-bold text-slate-900">
+                      {editingUsuarioId ? `Editar usuário #${editingUsuarioId}` : "Novo usuário"}
+                    </h4>
+
+                    <div className="mt-4 space-y-3">
+                      <div>
+                        <Label>Nome</Label>
+                        <Input
+                          value={usuarioForm.nome}
+                          onChange={(e) => setUsuarioForm((p) => ({ ...p, nome: e.target.value }))}
+                          placeholder="Nome completo"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Username</Label>
+                        <Input
+                          value={usuarioForm.username}
+                          onChange={(e) => setUsuarioForm((p) => ({ ...p, username: e.target.value }))}
+                          placeholder="usuario"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>{editingUsuarioId ? "Nova senha (opcional)" : "Senha"}</Label>
+                        <Input
+                          type="password"
+                          value={usuarioForm.senha}
+                          onChange={(e) => setUsuarioForm((p) => ({ ...p, senha: e.target.value }))}
+                          placeholder={editingUsuarioId ? "Deixe em branco para manter" : "Senha"}
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Role</Label>
+                        <Select
+                          value={usuarioForm.role}
+                          onChange={(e) => setUsuarioForm((p) => ({ ...p, role: e.target.value }))}
+                        >
+                          {SELECT_ROLES.map((o) => (
+                            <option key={o} value={o}>
+                              {o}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          id="ativo"
+                          type="checkbox"
+                          checked={usuarioForm.ativo}
+                          onChange={(e) => setUsuarioForm((p) => ({ ...p, ativo: e.target.checked }))}
+                        />
+                        <label htmlFor="ativo" className="text-sm text-slate-700">
+                          Usuário ativo
+                        </label>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <Button onClick={salvarUsuario}>
+                          {editingUsuarioId ? "Salvar alterações" : "Criar usuário"}
+                        </Button>
+                        <Button variant="outline" onClick={resetUsuarioForm}>
+                          Limpar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="min-w-full bg-white">
+                      <thead className="bg-slate-50">
+                        <tr className="text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                          <th className="px-4 py-3">ID</th>
+                          <th className="px-4 py-3">Nome</th>
+                          <th className="px-4 py-3">Username</th>
+                          <th className="px-4 py-3">Role</th>
+                          <th className="px-4 py-3">Ativo</th>
+                          <th className="px-4 py-3">Trocar senha</th>
+                          <th className="px-4 py-3">Ações</th>
+                        </tr>
+                      </thead>
+
+                      <tbody className="divide-y divide-slate-100">
+                        {usuarios.length === 0 ? (
+                          <tr>
+                            <td className="px-4 py-6 text-center text-sm text-slate-600" colSpan={7}>
+                              Nenhum usuário encontrado.
+                            </td>
+                          </tr>
+                        ) : (
+                          usuarios.map((u) => (
+                            <tr key={u.id} className="text-sm text-slate-800">
+                              <td className="px-4 py-3 font-semibold">{u.id}</td>
+                              <td className="px-4 py-3">{u.nome || "-"}</td>
+                              <td className="px-4 py-3">{u.username}</td>
+                              <td className="px-4 py-3">{u.role}</td>
+                              <td className="px-4 py-3">{u.ativo ? "Sim" : "Não"}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex min-w-[220px] gap-2">
+                                  <Input
+                                    type="password"
+                                    placeholder="Nova senha"
+                                    value={senhaReset[u.id] || ""}
+                                    onChange={(e) =>
+                                      setSenhaReset((prev) => ({
+                                        ...prev,
+                                        [u.id]: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                  <Button variant="outline" onClick={() => trocarSenhaUsuario(u.id)}>
+                                    Trocar
+                                  </Button>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-2">
+                                  <Button variant="outline" onClick={() => preencherUsuarioParaEdicao(u)}>
+                                    Editar
+                                  </Button>
+                                  <Button variant="danger" onClick={() => excluirUsuario(u.id)}>
+                                    Excluir
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Card>
+            </section>
+          )}
 
           {isAdmin && (
             <section id="relatorios">
@@ -1145,8 +1485,7 @@ export default function App() {
                       <SimpleTable title="Por motivo" data={relatorio.porMotivoSolicitacao} />
                       <SimpleTable title="Por curso" data={relatorio.porCurso} />
                       <SimpleTable title="Por notas" data={relatorio.porNotas} />
-                      <SimpleTable title="Por frequência" data={relatorio.porFrequencia} />
-                      <SimpleTable title="Campos preenchidos" data={relatorio.camposPreenchidos} />
+                      <SimpleTable title="Por frequência" data={relatorio.porFrequencia || relatorio.porRjo} />
                     </div>
                   </div>
                 )}
