@@ -3,16 +3,17 @@ server:
 
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/retencao}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASS:postgres}
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
 
 app:
   jwt:
-    secret: ${JWT_SECRET=47E1V4X6H3RJHaPv3jbV6CfhxbUGnK6Ww+Qt9G2s8OM=}
+    secret: ${JWT_SECRET}
     expiration: 86400000
